@@ -20,6 +20,7 @@ services:
       #1
       - /tmp/.X11-unix:/tmp/.X11-unix
       - /home/tejas/.Xauthority:/root/.Xauthority
+      - ./code:/app/code
     tty: true
     stdin_open: true
     network_mode: host
