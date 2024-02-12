@@ -19,7 +19,7 @@ robotStartOrientation = p.getQuaternionFromEuler([0, 0, 0])  # Robot's orientati
 
 # Construct the full path to the URDF file
 
-robot_urdf_file = os.path.join(script_dir, "universal-robot-ur5/ur5robot.urdf")
+robot_urdf_file = os.path.join(script_dir, "urdf/ur5.urdf")
 robotId = p.loadURDF(robot_urdf_file, robotStartPos, robotStartOrientation)
 
 # Simulation loop

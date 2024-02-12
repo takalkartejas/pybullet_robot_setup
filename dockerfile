@@ -4,7 +4,7 @@ FROM python:3.8.18
 WORKDIR /app
 
 #Copy files form the local system
-COPY /requirements.txt /app/requirements.txt
+ADD /requirements.txt /app/requirements.txt
 
 #change the default shell to bash
 
