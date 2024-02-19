@@ -21,7 +21,11 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - /home/tejas/.Xauthority:/root/.Xauthority
       - ./code:/app/code
+      - ./tacto_setup:/app/tacto_setup
+      - ./taxim_setup:/app/taxim_setup
       - ./tutorial:/app/tutorial
+      - /home/tejas/projects/bullet3:/app/bullet3
+      - /home/tejas/projects/taxim_test/taxim_copy:/app/Taxim      
     tty: true
     stdin_open: true
     network_mode: host
