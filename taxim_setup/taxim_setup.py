@@ -7,9 +7,13 @@ import tacto
 import pybulletX as px
 import cv2
 import hydra
+import sys
+sys.path.append('/app/Taxim')
+import taxim_robot
 
 # Get the directory of the Python file
 script_dir = os.path.dirname(os.path.realpath(__file__))
+
 
 # Start the simulation
 physicsClient = pybullet.connect(pybullet.GUI)  # or pybullet.DIRECT for non-graphical version
