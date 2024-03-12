@@ -61,16 +61,16 @@ pybullet_data_location = "/app/bullet3/examples/pybullet/gym/pybullet_data"
 rob= Robot(robot)
 cam = utils.Camera(pybullet,[640,480])
 
-sensorLinks = rob.get_id_by_name(["guide_joint_finger_left","guide_joint_finger_right"])
+sensorLinks = rob.get_id_by_name(["guide_joint_finger_left"])
 gelsight.add_camera(robot, sensorLinks)
 nbJoint = pybullet.getNumJoints(robot)
-sensorID1,sensorID2 = rob.get_id_by_name(["guide_joint_finger_left","guide_joint_finger_right"])
+sensorID1= rob.get_id_by_name(["guide_joint_finger_left"])
 # color, depth = gelsight.render()
 # gelsight.updateGUI(color, depth)
 
 
 urdfObj, obj_mass, obj_height, force_range, deformation, _ = getObjInfo("RubiksCube")
-objStartPos = [-0.08, 0.3, obj_height / 2 ]
+objStartPos = [0.09, 0.35, obj_height / 2 ]
 objStartOrientation = pybullet.getQuaternionFromEuler([0, 0, np.pi / 2])
 objID = pybullet.loadURDF(urdfObj, objStartPos, objStartOrientation)
 obj_weight = pybullet.getDynamicsInfo(objID, -1)[0]
@@ -125,8 +125,9 @@ pybullet.setGravity(0, 0, -9.81)  # Set gravity
 pybullet.setTimeStep(0.0001)  # Set the simulation time step
 pybullet.setRealTimeSimulation(0)
 
+rob.gripper_open()
 # Set initial joint positions manually
-initial_joint_positions = [math.pi/2,math.pi/2,-math.pi/2,2,-math.pi/2,-math.pi/2]  # Example joint positions
+initial_joint_positions = [-math.pi/2,-2,-1.8,2,-math.pi/2,-math.pi/2]  # Example joint positions
 pybullet.setJointMotorControlArray(
     robot, range(6), pybullet.POSITION_CONTROL,
     targetPositions=initial_joint_positions)
@@ -163,8 +164,13 @@ try:
             vision_size, tactile_size = visionColor_tmp.shape, tactileColor_tmp[0].shape
             video_path = os.path.join("video", "demo.mp4")
             rec = utils.video_recorder(vision_size, tactile_size, path=video_path, fps=30)
-        if t == 300:
-            normalForce0, lateralForce0 = utils.get_forces(pybullet, robot, objID, sensorID1, -1)
+            
+        elif t> 650 and t <700:
+            rob.gripper_control(0.05)
+            print("/n gripper close")
+            
+        if t == 720:
+            normalForce0, lateralForce0 = utils.get_forces(pybullet, robot, objID, sensorID1[0], -1)
             tactileColor, tactileDepth = gelsight.render()
             data_dict={}
             data_dict["tactileColorL"], data_dict["tactileDepthL"] = tactileColor[0], tactileDepth[0]
@@ -197,7 +203,7 @@ try:
             data_dict["visual"] = visualize_data
 
             rec.release()
-        elif t>820:
+        if t>820:
             break
                 ### seq data
         if t % 3 == 0:
@@ -205,6 +211,7 @@ try:
             visionColor, visionDepth = cam.get_image()
             rec.capture(visionColor.copy(), tactileColor_tmp[0].copy())
         gelsight.update()
+        print("\nt=",t)
         t += 1
 except KeyboardInterrupt:
     print('keyboard interrupt')
