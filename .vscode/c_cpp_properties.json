@@ -1,0 +1,32 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/tejas/projects/mj_ros_demo_ws/devel/include/**",
+        "/home/tejas/catkin_ws/devel/include/**",
+        "/opt/ros/noetic/include/**",
+        "/home/tejas/projects/mj_ros_demo_ws/src/mujoco_contact_surfaces/mujoco_contact_surface_sensors/include/**",
+        "/home/tejas/projects/mj_ros_demo_ws/src/mujoco_contact_surfaces/mujoco_contact_surfaces/include/**",
+        "/home/tejas/projects/mj_ros_demo_ws/src/mujoco_ros_pkgs/mujoco_ros/include/**",
+        "/home/tejas/projects/mj_ros_demo_ws/src/mujoco_ros_pkgs/mujoco_ros_control/include/**",
+        "/home/tejas/projects/mj_ros_demo_ws/src/mujoco_ros_pkgs/mujoco_ros_mocap_plugin/include/**",
+        "/home/tejas/projects/mj_ros_demo_ws/src/mujoco_ros_pkgs/mujoco_ros_sensors/include/**",
+        "/home/tejas/projects/mj_ros_demo_ws/src/tactile_toolbox/rviz_tactile_plugins/include/**",
+        "/home/tejas/projects/mj_ros_demo_ws/src/tactile_toolbox/tactile_merger/include/**",
+        "/home/tejas/catkin_ws/src/turtlebot3/turtlebot3_slam/include/**",
+        "/home/tejas/projects/mj_ros_demo_ws/src/tactile_toolbox/urdf_tactile/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

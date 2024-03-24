@@ -25,7 +25,7 @@ services:
       - ./taxim_setup:/app/taxim_setup
       - ./tutorial:/app/tutorial
       - /home/tejas/projects/bullet3:/app/bullet3
-      - /home/tejas/projects/taxim_test/taxim_copy:/app/Taxim      
+      - ./taxim_test/taxim_copy:/app/Taxim      
     tty: true
     stdin_open: true
     network_mode: host
