@@ -26,6 +26,12 @@ def _align_image(img1, img2):
     new_img[:img2.shape[0], img_size[1]:img_size[1] + img2.shape[1], :] = (img1[..., :3])[..., ::-1]
     return new_img
 
+def starting_robot_joints(initial_joint_positions):
+    global robot
+    initial_joint_positions[joint_index]
+    num_joints = pybullet.getNumJoints(robot)
+    for joint_index in range(num_joints):
+        pybullet.resetJointState(robot, joint_index, initial_joint_positions[joint_index])
 
 '''taxim'''
 # Get the directory of the Python file
@@ -33,12 +39,12 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 
 
 # Start the simulation
-physicsClient = pybullet.connect(pybullet.DIRECT)  # or pybullet.DIRECT for non-graphical version
+physicsClient = pybullet.connect(pybullet.GUI)  # or pybullet.DIRECT for non-graphical version
 pybullet.resetSimulation()
 pybullet.setAdditionalSearchPath(pybullet_data.getDataPath())  # Set the search path to find URDF files
 
 '''taxim'''
-gelsight = taxim_robot.Sensor(width=640, height=480, visualize_gui=False)
+gelsight = taxim_robot.Sensor(width=640, height=480, visualize_gui=True)
 
 # Load the ground plane
 planeId = pybullet.loadURDF("plane.urdf")
@@ -126,12 +132,16 @@ pybullet.setTimeStep(0.0001)  # Set the simulation time step
 pybullet.setRealTimeSimulation(0)
 
 rob.gripper_open()
+initial_joint_positions = [math.pi/2,math.pi/2,-math.pi/2,-math.pi/2,-math.pi/2,-math.pi/2] 
+starting_robot_joints(initial_joint_positions)
+
+
 # Set initial joint positions manually
-initial_joint_positions = [-math.pi/2,-2,-1.8,2,-math.pi/2,-math.pi/2]  # Example joint positions
+final_joint_positions = [-math.pi/2,-2,-1.8,2,-math.pi/2,-math.pi/2]  # Example joint positions
 pybullet.setJointMotorControlArray(
     robot, range(6), pybullet.POSITION_CONTROL,
-    targetPositions=initial_joint_positions)
-final_joint_positions = [math.pi/2,math.pi/2,-math.pi/2,-0.2,-math.pi/2,-math.pi/2] 
+    targetPositions=final_joint_positions)
+
 
 # rob.gripper_control(width=20)
 try:
