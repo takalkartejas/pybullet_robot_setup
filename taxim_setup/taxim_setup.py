@@ -33,12 +33,12 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 
 
 # Start the simulation
-physicsClient = pybullet.connect(pybullet.GUI)  # or pybullet.DIRECT for non-graphical version
+physicsClient = pybullet.connect(pybullet.DIRECT)  # or pybullet.DIRECT for non-graphical version
 pybullet.resetSimulation()
 pybullet.setAdditionalSearchPath(pybullet_data.getDataPath())  # Set the search path to find URDF files
 
 '''taxim'''
-gelsight = taxim_robot.Sensor(width=640, height=480, visualize_gui=True)
+gelsight = taxim_robot.Sensor(width=640, height=480, visualize_gui=False)
 
 # Load the ground plane
 planeId = pybullet.loadURDF("plane.urdf")
