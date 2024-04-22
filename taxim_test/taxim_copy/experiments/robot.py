@@ -254,6 +254,16 @@ class Robot:
             targetPositions=[-width / 2, width / 2],
         )
         self.width = width
+    # Change the gripper to target width
+    def gripper_control_force(self, width, force):
+        pb.setJointMotorControlArray(
+            self.robotID,
+            self.gripperJoints,
+            pb.POSITION_CONTROL,
+            targetPositions=[-width / 2, width / 2],
+            forces=[force,force]
+        )
+        self.width = width
 
     # Gripper close
     def gripper_close(self, width=None, max_torque=None):
