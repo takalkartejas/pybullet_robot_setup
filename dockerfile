@@ -15,7 +15,7 @@ RUN apt-get install -y libgl1-mesa-glx
 RUN ldconfig
 
 RUN pip install --upgrade pip
-RUN pip install tacto
+# RUN pip install tacto
 RUN pip install -r requirements.txt
 #this needs to be installed for virtual display as physical display is unavailable
 #use xvfb-run -a python taxim_setup.py to run a with virtual display

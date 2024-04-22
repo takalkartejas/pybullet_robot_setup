@@ -3,7 +3,6 @@ import pybullet_data
 import os
 import time
 import math
-import tacto
 import pybulletX as px
 import cv2
 import hydra
@@ -17,7 +16,11 @@ import utils
 from robot import Robot
 from collections import defaultdict
 from setup2 import getObjInfo
+import robot_functions
 
+
+robot_func = robot_functions.robot_functions()
+robot_func.print_message()
 
 def _align_image(img1, img2):
     img_size = [480, 640]
@@ -28,8 +31,7 @@ def _align_image(img1, img2):
 
 def starting_robot_joints(initial_joint_positions):
     global robot
-    initial_joint_positions[joint_index]
-    num_joints = pybullet.getNumJoints(robot)
+    num_joints = 6
     for joint_index in range(num_joints):
         pybullet.resetJointState(robot, joint_index, initial_joint_positions[joint_index])
 
@@ -132,12 +134,18 @@ pybullet.setTimeStep(0.0001)  # Set the simulation time step
 pybullet.setRealTimeSimulation(0)
 
 rob.gripper_open()
-initial_joint_positions = [math.pi/2,math.pi/2,-math.pi/2,-math.pi/2,-math.pi/2,-math.pi/2] 
+
+
+initial_joint_positions = [-math.pi/2,-math.pi/2,-math.pi/2,-math.pi/2,-math.pi/2,-math.pi/2] 
 starting_robot_joints(initial_joint_positions)
 
 
 # Set initial joint positions manually
 final_joint_positions = [-math.pi/2,-2,-1.8,2,-math.pi/2,-math.pi/2]  # Example joint positions
+end_effector_link_index = 7
+# Calculate inverse kinematics
+# joint_positions = pybullet.calculateInverseKinematics(robot, end_effector_link_index, target_position, target_orientation)
+
 pybullet.setJointMotorControlArray(
     robot, range(6), pybullet.POSITION_CONTROL,
     targetPositions=final_joint_positions)

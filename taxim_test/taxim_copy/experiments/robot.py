@@ -21,6 +21,7 @@ class Robot:
         ]
         self.armJoints = self.get_id_by_name(self.armNames)
         self.armControlID = self.get_control_id_by_name(self.armNames)
+        self.targetPose = []
 
         '''change to suit my robot'''
         # # Get link/joint ID for gripper
@@ -43,6 +44,7 @@ class Robot:
         '''my robot'''
         self.eeName = ["ee_fixed_joint"]
         self.eefID = self.get_id_by_name(self.eeName)[0]
+        print('eefid2=',self.eefID)
 
 
         self.armHome = [-0.26730250468455913, -1.571434616558095, 1.7978336633640315,
@@ -58,7 +60,7 @@ class Robot:
         self.delta_pos = 0.05
         self.delta_rot = np.pi / 10
         self.delta_width = 0.01
-
+        self.counter = 0
         # self.init_robot()
 
     def get_id_by_name(self, names):
@@ -79,14 +81,14 @@ class Robot:
         """
         #tt- the robot id indicates ure_wsg50_simplified
         nbJoint = pb.getNumJoints(self.robotID)
-        print("/n nbjoints=", nbJoint)
+        # print("/n nbjoints=", nbJoint)
         jointNames = {}
         ctlID = 0
         for i in range(nbJoint):
     
             jointInfo = pb.getJointInfo(self.robotID, i)
             name = jointInfo[1].decode("utf-8")
-            print("\n unfiltered joint =", name)
+            # print("\n unfiltered joint =", name)
             # skip fixed joint
             if jointInfo[2] == 4:
                 
@@ -98,7 +100,7 @@ class Robot:
                 continue
             jointNames[name] = ctlID
             ctlID += 1
-            print("\n joint =", name)
+            # print("\n joint =", name)
 
         return [jointNames[name] for name in names]
     """
@@ -200,13 +202,15 @@ class Robot:
 
         jointPose[self.gripperControlID[0]] = -width / 2
         jointPose[self.gripperControlID[1]] = width / 2
-
+        
         maxForces = np.ones(len(jointPose)) * 200
         maxForces[self.gripperControlID] = gripForce
 
         # Select the relavant joints for arm and gripper
         jointPose = jointPose[self.armControlID + self.gripperControlID]
         maxForces = maxForces[self.armControlID + self.gripperControlID]
+
+        self.targetPose = jointPose
 
         pb.setJointMotorControlArray(
             self.robotID,
@@ -258,3 +262,76 @@ class Robot:
     # Gripper open
     def gripper_open(self):
         self.gripper_control(0.11)
+
+    def check_joint_positions(self, tolerance=0.01):
+        all_in_position = True
+        target_positions=self.targetPose 
+        joint_indices =tuple(self.armJoints + self.gripperJoints)
+        for i, joint_index in enumerate(joint_indices):
+            current_position = pb.getJointState(self.robotID, joint_index)[0]
+            print('current pose=', current_position)
+            print('target pose=', target_positions[i])
+            if abs(current_position - target_positions[i]) > tolerance:
+                all_in_position = False
+                break
+        return all_in_position
+
+    def goAndStop(self, pos, ori=None, width=None, wait=False, gripForce=20):
+        if ori is None:
+            ori = self.ori
+
+        if width is None:
+            width = self.width
+
+        ori_q = pb.getQuaternionFromEuler(ori)
+
+        jointPose = pb.calculateInverseKinematics(self.robotID, self.eefID, pos, ori_q)
+        jointPose = np.array(jointPose)
+
+        jointPose[self.gripperControlID[0]] = -width / 2
+        jointPose[self.gripperControlID[1]] = width / 2
+
+        self.targetPose = jointPose
+        maxForces = np.ones(len(jointPose)) * 200
+        maxForces[self.gripperControlID] = gripForce
+
+        # Select the relavant joints for arm and gripper
+        jointPose = jointPose[self.armControlID + self.gripperControlID]
+        maxForces = maxForces[self.armControlID + self.gripperControlID]
+        pb.setJointMotorControlArray(
+            self.robotID,
+            tuple(self.armJoints + self.gripperJoints),
+            pb.POSITION_CONTROL,
+            targetPositions=jointPose,
+            forces=maxForces,
+        )
+
+        self.pos = pos
+        if ori is not None:
+            self.ori = ori
+        if width is not None:
+            self.width = width
+
+        if wait:
+            last_err = 1e6
+            while True:
+                pb.stepSimulation()
+                ee_pose = self.get_ee_pose()
+                w = self.get_gripper_width()
+                err = (
+                        np.sum(np.abs(np.array(ee_pose[0]) - pos))
+                        + np.sum(np.abs(np.array(ee_pose[1]) - ori_q))
+                        + np.abs(w - width)
+                )
+                diff_err = last_err - err
+                last_err = err
+
+                if np.abs(diff_err) < self.tol:
+                    break        
+        reached_destination= self.check_joint_positions(tuple(self.armJoints + self.gripperJoints),jointPose)
+        if reached_destination:
+            self.counter = 0
+        else:
+            self.counter += 1
+        return reached_destination
+        return False
