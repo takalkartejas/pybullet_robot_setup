@@ -138,7 +138,7 @@ pybullet.resetDebugVisualizerCamera(cameraDistance=3, cameraYaw=90, cameraPitch=
 
 '''simulation'''
 pybullet.setGravity(0, 0, -9.81)  # Set gravity
-pybullet.setTimeStep(0.0001)  # Set the simulation time step
+pybullet.setTimeStep(0.00001)  # Set the simulation time step
 pybullet.setRealTimeSimulation(0)
 
 rob.gripper_open()

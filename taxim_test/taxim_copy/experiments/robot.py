@@ -36,7 +36,9 @@ class Robot:
         ]
         
         self.gripperJoints = self.get_id_by_name(self.gripperNames)
+        print('gripper joints=', self.gripperJoints)
         self.gripperControlID = self.get_control_id_by_name(self.gripperNames)
+        print('gripperControlID=',self.gripperControlID)
         pb.enableJointForceTorqueSensor(self.robotID, self.gripperJoints[0])
         pb.enableJointForceTorqueSensor(self.robotID, self.gripperJoints[1])
 
@@ -202,7 +204,6 @@ class Robot:
 
         jointPose[self.gripperControlID[0]] = -width / 2
         jointPose[self.gripperControlID[1]] = width / 2
-        
         maxForces = np.ones(len(jointPose)) * 200
         maxForces[self.gripperControlID] = gripForce
 
@@ -211,7 +212,7 @@ class Robot:
         maxForces = maxForces[self.armControlID + self.gripperControlID]
 
         self.targetPose = jointPose
-
+        print('tuple=', tuple(self.armJoints + self.gripperJoints))
         pb.setJointMotorControlArray(
             self.robotID,
             tuple(self.armJoints + self.gripperJoints),
