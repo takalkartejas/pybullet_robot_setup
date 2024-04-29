@@ -110,7 +110,8 @@ class entities():
         self.planeId = pybullet.loadURDF("plane.urdf")
 
     def load_object(self):
-        self.urdfObj, self.obj_mass, self.obj_height, self.force_range, self.deformation, _ = getObjInfo("RubiksCube")
+        # self.urdfObj, self.obj_mass, self.obj_height, self.force_range, self.deformation, _ = getObjInfo("RubiksCube")
+        self.urdfObj, self.obj_mass, self.obj_height, self.force_range, self.deformation, _ = getObjInfo("TomatoSoupCan")
         self.objStartPos = [0.09, 0.35, self.obj_height / 2 ]
         self.objStartOrientation = pybullet.getQuaternionFromEuler([0, 0, np.pi / 2])
         self.objID = pybullet.loadURDF(self.urdfObj, self.objStartPos, self.objStartOrientation)
@@ -160,7 +161,11 @@ class slip_simulation():
             
             # joint_positions =[-pi/2,-pi/2,pi/2,-pi/2,-pi/2,0.1, -0.1] 
             #5= gripper right,6 gripper left, 0= axis 2, 1= axis 3, 2= axis 4, 3=axis 5, 4=axis 
-            joint_positions =[-1,-pi/2,pi/2,-pi/2,-pi/2,0.1, -0.1] 
+            joint_positions =[-pi/2,-pi/2,pi/2,-pi/2,-pi/2,0.1, -0.1] 
+            self.pick_up_target =[-pi/2]
+            for i in range(5):
+                self.pick_up_target.append(joint_positions[i])
+            print(self.pick_up_target)
             maxForces[gripperControlID] = 20
             # rob.go([0.09,0.35,0.2],width=0.5)
 
@@ -168,16 +173,28 @@ class slip_simulation():
             Entity.robot, tuple([1, 2, 3, 4, 5, 8, 10]), pybullet.POSITION_CONTROL,
             targetPositions=joint_positions, targetVelocities=[0.01,0.1,0.1,0.1,0.1,0.1,0.1], forces=[500,200,100,100,100,300,300])
     
-    def check_pick_up(self):
+    def check_pick_up(self, threshold):
         # Get current positions of all joints
-        num_joints = 7
-        current_positions = pybullet.getJointState(Entity.robot, 2)[0]
-        #1 =  axis2, 
-        # current_positions = [pybullet.getJointState(Entity.robot, i)[0] for i in range(num_joints)]
-        print('current positions=', current_positions)
+        num_joints = 6
+
+        # current_positions = pybullet.getJointState(Entity.robot, 10)[0]
+        #1 = axis2, 2 =axis3, 3 =axis4, 4 = axis5, 5= axis6, 8 = gripper1
+        current_positions = [pybullet.getJointState(Entity.robot, i)[0] for i in range(num_joints)]
+        
         # # Check if all joints have reached their desired positions
-        # all_in_desired_position = all(abs(current_positions[i] - target_positions[i]) < position_threshold
-        #                             for i in range(num_joints))
+        all_in_desired_position = all(abs(current_positions[i] - self.pick_up_target[i]) < threshold
+                                    for i in range(num_joints))
+        print('current positions=', current_positions)
+        print('goal=', self.pick_up_target)
+        print(all_in_desired_position)
+
+    def robot_stopped(self):
+        num_joints = 6
+        threshold = 0.001
+        current_velocities = [pybullet.getJointState(Entity.robot, i)[1] for i in range(num_joints)]
+        robot_stopped = all(abs(current_velocities[i] - 0) < threshold
+                                    for i in range(num_joints))
+        return robot_stopped
 
     
     def create_slip(self, t):
@@ -198,13 +215,15 @@ class slip_simulation():
                 self.obj_position_z_array.append(obj_position_z)
 
         #calculate the average of the array, used to calculate pos difference and thus slip
-        if t == self.entry_time+41:
+        diff = t- self.entry_time
+        # print(diff)
+        if t == self.entry_time +41:
             for pos in self.obj_position_z_array:
                 self.sum = self.sum + pos
             self.avg_obj_position_z = self.sum/len(self.obj_position_z_array)
 
         # calculate if the object is slipping, increase the mass if not
-        if t >self.entry_time+ 45:
+        if t >self.entry_time+ 50:
             if t%3==0:
                 pos_diff_z = self.avg_obj_position_z - obj_position_z
                 print(pos_diff_z)
@@ -324,9 +343,13 @@ if __name__ == "__main__":
 
     #start slip simulation by moving robot to object
     SS.init_ss()
-    SS.go_to_object()
+    
     Control.start_timer()
 
+    #flags and counters
+    reset_grasp = True
+    slip_counter = 0
+    after_picking_up = False
     #try and execept are used for keyboard interrupt cntrl+c
     try:
         
@@ -337,7 +360,9 @@ if __name__ == "__main__":
             pybullet.stepSimulation()
             Setup.adjust_camera_with_keyboard()            
             Control.dynamic_delay()
-            
+
+            if t == 100:
+                SS.go_to_object()
 
             if t == 200:
                 print('gripper close')
@@ -348,22 +373,18 @@ if __name__ == "__main__":
                 print('pick up')
                 SS.pick_up()
             
-            if 300<t<600:
-                SS.check_pick_up() 
-            if t> 600:
-                if t%3 ==0:
-                    gripper_positions = [pybullet.getJointState(Entity.robot, joint_index)[0] for joint_index in Entity.gripperJoints]
-                    gripper_position_log.append(gripper_positions)
-            if t==610:
-                SS.reset_grasp(gripper_positions)
             #after robot picked up object and went back
-
-            if t > 650: 
-                SS.create_slip(t)
-
-
-
-                    
+            if t> 600 and SS.robot_stopped()==True:
+                after_picking_up = True
+            if after_picking_up == True:
+                if reset_grasp==True:
+                    gripper_positions = [pybullet.getJointState(Entity.robot, joint_index)[0] for joint_index in Entity.gripperJoints]
+                    SS.reset_grasp(gripper_positions)
+                    reset_grasp=False
+                if slip_counter > 50:
+                    SS.create_slip(t)
+                slip_counter+=1     
+                
             t=t+1
             
     except KeyboardInterrupt:
@@ -371,8 +392,8 @@ if __name__ == "__main__":
 pybullet.disconnect()
 
 
-# Save the gripper positions log to a CSV file
-with open("gripper_positions_log.csv", "w", newline='') as csvfile:
-    writer = csv.writer(csvfile)
-    for positions in gripper_position_log:
-        writer.writerow(positions)
+# # Save the gripper positions log to a CSV file
+# with open("gripper_positions_log.csv", "w", newline='') as csvfile:
+#     writer = csv.writer(csvfile)
+#     for positions in gripper_position_log:
+#         writer.writerow(positions)
