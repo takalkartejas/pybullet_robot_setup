@@ -376,6 +376,7 @@ if __name__ == "__main__":
             #after robot picked up object and went back
             if t> 600 and SS.robot_stopped()==True:
                 after_picking_up = True
+                
             if after_picking_up == True:
                 if reset_grasp==True:
                     gripper_positions = [pybullet.getJointState(Entity.robot, joint_index)[0] for joint_index in Entity.gripperJoints]
