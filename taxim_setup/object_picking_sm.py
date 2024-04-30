@@ -161,7 +161,7 @@ class entities():
         self.robotStartPos = [0, 0, 0]  # Coordinates of the robot in the world
         self.robotStartOrientation = pybullet.getQuaternionFromEuler([0, 0, 0])  # Robot's orientation (roll, pitch, yaw)
         # Construct the full path to the URDF file
-        self.robot_urdf_file = os.path.join(script_dir, "urdf/ur5_robotiq_85.urdf")
+        self.robot_urdf_file = os.path.join(script_dir, "urdf/ur5_robotiq_85_friction.urdf")
         self.robot = pybullet.loadURDF(self.robot_urdf_file, self.robotStartPos, self.robotStartOrientation, useFixedBase=1)
         self.rob = Robot(self.robot)
     def set_joints_friction(self,joint_friction):
