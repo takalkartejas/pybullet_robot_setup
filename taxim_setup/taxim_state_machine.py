@@ -25,12 +25,12 @@ from stl import mesh
 #to enumarate states and events in FSM
 from enum import Enum 
 
-class setup():
+class Setup():
 
     def __init__(self):
         self.pybullet_data_location = "/app/bullet3/examples/pybullet/gym/pybullet_data"
         self.objects_location = '/app/Taxim/experiments/setup2/objects2'
-        global Entity
+        global entity
         self.object_names = [name for name in os.listdir(self.objects_location) if os.path.isdir(os.path.join(self.objects_location, name))]
         self.gui = True
 
@@ -42,7 +42,7 @@ class setup():
         self.cdist=1 
         self.cyaw=180 
         self.cpitch=-20
-        self.focuse_position,_ = pybullet.getBasePositionAndOrientation(Entity.robot)
+        self.focuse_position,_ = pybullet.getBasePositionAndOrientation(entity.robot)
         pybullet.resetDebugVisualizerCamera(cameraDistance=self.cdist, cameraYaw=self.cyaw, cameraPitch=self.cpitch, cameraTargetPosition=self.focuse_position)
 
     def start_simulation(self):
@@ -135,7 +135,7 @@ class setup():
         return urdf_path, mass, height, force_range, deformation, friction
 
 
-class control():
+class Control():
     def __init__(self):
         self.x =0
         global Robot
@@ -159,7 +159,7 @@ class control():
         self.last_time = self.current_time
 
 
-class entities():
+class Entities():
     def __init__(self):
         self.x =0
     def loadRobot(self, script_dir):
@@ -200,7 +200,7 @@ class entities():
         #['YcbPottedMeatCan', 'YcbStrawberry','YcbTomatoSoupCan', 
         # 'YcbMustardBottle', 'YcbChipsCan', 'YcbFoamBrick', 'YcbPear', 'MustardBottle', 'TomatoSoupCan', 
         # 'RubiksCube', 'YcbTennisBall', 'YcbMediumClamp']
-        self.urdfObj, self.obj_mass, self.obj_height, self.force_range, self.deformation, _ = Setup.getObjInfo(Setup.object_names[obj_select_id])
+        self.urdfObj, self.obj_mass, self.obj_height, self.force_range, self.deformation, _ = setup.getObjInfo(setup.object_names[obj_select_id])
         self.objStartPos = [0.09, 0.35, self.obj_height / 2 ]
         self.objStartOrientation = pybullet.getQuaternionFromEuler([0, 0, np.pi / 2])
         self.objID = pybullet.loadURDF(self.urdfObj, self.objStartPos, self.objStartOrientation)
@@ -214,28 +214,124 @@ class entities():
             "base_joint_gripper_right",
 
         ]
-        self.gripperJoints = Entity.rob.get_id_by_name(self.gripperNames)
+        self.gripperJoints = entity.rob.get_id_by_name(self.gripperNames)
 
 
-class slip_simulation():
+class Sensor():
+    def __init__(self):
+        self.x =0  
+        self.rot=0  
+        self.gripForce = 20
+        self.visualize_data = []
+
+        
+    def align_image(self, img1, img2):
+        img_size = [480, 640]
+        new_img = np.zeros([img_size[0], img_size[1] * 2, 3], dtype=np.uint8)
+        new_img[:img1.shape[0], :img1.shape[1]] = img2[..., :3]
+        new_img[:img2.shape[0], img_size[1]:img_size[1] + img2.shape[1], :] = (img1[..., :3])[..., ::-1]
+        return new_img
+    def setup_sensor(self):
+        self.gelsight = taxim_robot.Sensor(width=640, height=480, visualize_gui=True)
+        self.cam = utils.Camera(pybullet,[640,480])
+        sensorLinks = entity.rob.get_id_by_name(["guide_joint_finger_left"])
+        self.gelsight.add_camera(entity.robot, sensorLinks)
+        nbJoint = pybullet.getNumJoints(entity.robot)
+        self.sensorID1= entity.rob.get_id_by_name(["guide_joint_finger_left"])
+        self.gelsight.add_object(entity.urdfObj, entity.objID, force_range=entity.force_range, deformation=entity.deformation)
+
+    def sensor_start(self):
+            tactileColor_tmp, _ = self.gelsight.render()
+            visionColor_tmp, _ = self.cam.get_image()
+            self.visualize_data.append(self.align_image(tactileColor_tmp[0], visionColor_tmp))
+            vision_size, tactile_size = visionColor_tmp.shape, tactileColor_tmp[0].shape
+            video_path = os.path.join("video", "demo.mp4")
+            self.rec = utils.video_recorder(vision_size, tactile_size, path=video_path, fps=30)
+
+    def sensor_read(self):
+        #what is the grip force?
+        normalForce0, lateralForce0 = utils.get_forces(pybullet, entity.robot, entity.objID, self.sensorID1[0], -1)
+        tactileColor, tactileDepth = self.gelsight.render()
+        data_dict={}
+        data_dict["tactileColorL"], data_dict["tactileDepthL"] = tactileColor[0], tactileDepth[0]
+        data_dict["visionColor"], data_dict["visionDepth"] = self.cam.get_image()
+        normalForce = [normalForce0]
+        data_dict["normalForce"] = normalForce
+        data_dict["height"], data_dict["gripForce"], data_dict["rot"] = utils.heightSim2Real(
+            [0,0,0]), self.gripForce, self.rot
+        # objPos0, objOri0, _ = utils.get_object_pose(pb, objID)
+        self.visualize_data.append(self.align_image(data_dict["tactileColorL"], data_dict["visionColor"]))
+
+    def save_data(self):
+        tactileColor_tmp, depth = self.gelsight.render()
+        visionColor_tmp, _ = self.cam.get_image()
+        self.visualize_data.append(self.align_image(tactileColor_tmp[0], visionColor_tmp))
+        
+        # gelsight.updateGUI(tactileColor_tmp, depth)
+        # objPos, objOri, _ = utils.get_object_pose(pb, objID)
+        # label = 1*(normalForce0 > 0.1 and np.linalg.norm(objOri - objStartOrientation) < 0.1)
+        # data_dict["label"] = label
+        self.data_dict["visual"] = self.visualize_data        
+    def save_data2(self):
+        tactileColor_tmp, depth = self.gelsight.render()
+        visionColor, visionDepth = self.cam.get_image()
+        self.rec.capture(visionColor.copy(), tactileColor_tmp[0].copy())   
+
+    def generate_config_list(self):
+            ## maybe a look up table
+            force_range_list = {
+                "cube": [10],
+            }
+            gripForce_list = force_range_list["cube"]
+            dx_range_list = defaultdict(lambda: np.linspace(-0.015, 0.02, 10).tolist())
+            dx_range_list['cube'] = np.array([0.05]) + 0.04
+            dx_list = dx_range_list['cube']
+            config_list = []
+            total_data = 0
+            for j, force in enumerate(gripForce_list):
+                for k, dx in enumerate(dx_list):
+                    config_list.append((force, dx))
+                    total_data += 1
+            print('config=',config_list)
+            t=num_pos=num_data = 0
+            rot=0
+
+
+
+class SlipSimulation():
     def __init__(self):
         self.x =0
-        global Entity
-        self.create_slip_entry_point = True
+        global entity
+        
         self.obj_position_z_array = []
         self.sum =0
         self.new_mass = 0.1
+
+        #flags
+        self.create_slip_entry_point = True
         self.object_fell = False
+        self.reset_grasp_flag = True
+        self.after_picking_up = False
+        self.sensor_on = False
+
+        #counters
+        self.slip_counter = 0
+
     def reset_variables(self):
         self.create_slip_entry_point = True
         self.obj_position_z_array = []
         self.sum =0
         self.new_mass = 0.1
-        self.object_fell = False       
+        self.object_fell = False      
+        self.reset_grasp_flag = True
+        self.slip_counter = 0
+        self.after_picking_up = False
+        self.sensor_on = False 
+
     def init_ss(self):
         #start the robot in this position
         self.initial_joint_positions = [-math.pi/2,-math.pi/2,-math.pi/2,math.pi/2,-math.pi/2,-math.pi/2] 
-        Entity.initialize_robot_at(self.initial_joint_positions)
+        entity.initialize_robot_at(self.initial_joint_positions)
 
 
 
@@ -244,11 +340,11 @@ class slip_simulation():
         gripping_joint_positions = [-math.pi/2,-2,-1.8,2,-math.pi/2,-math.pi/2] 
 
         pybullet.setJointMotorControlArray(
-        Entity.robot, range(6), pybullet.POSITION_CONTROL,
+        entity.robot, range(6), pybullet.POSITION_CONTROL,
         targetPositions=gripping_joint_positions, targetVelocities=[0.00001,0.00001,0.00001,0.00001,0.00001,0.00001])
 
     def grasp_object(self):
-        Entity.rob.gripper_control_force(0.05,200)
+        entity.rob.gripper_control_force(0.05,200)
         
     def pick_up(self):
             
@@ -266,7 +362,7 @@ class slip_simulation():
             # rob.go([0.09,0.35,0.2],width=0.5)
 
             pybullet.setJointMotorControlArray(
-            Entity.robot, tuple([1, 2, 3, 4, 5, 8, 10]), pybullet.POSITION_CONTROL,
+            entity.robot, tuple([1, 2, 3, 4, 5, 8, 10]), pybullet.POSITION_CONTROL,
             targetPositions=joint_positions, targetVelocities=[0.01,0.1,0.1,0.1,0.1,0.1,0.1], forces=[500,200,100,100,100,300,300])
     
     def check_pick_up(self, threshold):
@@ -275,7 +371,7 @@ class slip_simulation():
 
         # current_positions = pybullet.getJointState(Entity.robot, 10)[0]
         #1 = axis2, 2 =axis3, 3 =axis4, 4 = axis5, 5= axis6, 8 = gripper1
-        current_positions = [pybullet.getJointState(Entity.robot, i)[0] for i in range(num_joints)]
+        current_positions = [pybullet.getJointState(entity.robot, i)[0] for i in range(num_joints)]
         
         # # Check if all joints have reached their desired positions
         all_in_desired_position = all(abs(current_positions[i] - self.pick_up_target[i]) < threshold
@@ -287,14 +383,14 @@ class slip_simulation():
     def robot_stopped(self):
         num_joints = 6
         threshold = 0.001
-        current_velocities = [pybullet.getJointState(Entity.robot, i)[1] for i in range(num_joints)]
+        current_velocities = [pybullet.getJointState(entity.robot, i)[1] for i in range(num_joints)]
         robot_stopped = all(abs(current_velocities[i] - 0) < threshold
                                     for i in range(num_joints))
         return robot_stopped
 
     
     def create_slip(self, t):
-        pybullet.changeDynamics(Entity.objID, -1, mass=self.new_mass)
+        pybullet.changeDynamics(entity.objID, -1, mass=self.new_mass)
         if self.create_slip_entry_point==True:
             self.entry_time = t
             self.create_slip_entry_point=False
@@ -302,7 +398,7 @@ class slip_simulation():
 
         #save the current z pos of object
         if t%3 == 0:   
-            obj_position,obj_orientation = pybullet.getBasePositionAndOrientation(Entity.objID)
+            obj_position,obj_orientation = pybullet.getBasePositionAndOrientation(entity.objID)
             obj_position_z = obj_position[2] 
 
         # save the position in an array
@@ -330,7 +426,7 @@ class slip_simulation():
                     self.slip_occured = True
     def check_object_fall(self):
         
-        obj_position,obj_orientation = pybullet.getBasePositionAndOrientation(Entity.objID)
+        obj_position,obj_orientation = pybullet.getBasePositionAndOrientation(entity.objID)
         obj_position_z = obj_position[2] 
         if abs(obj_position_z - self.avg_obj_position_z) > 0.2:
             self.object_fell = True
@@ -341,85 +437,8 @@ class slip_simulation():
         diff = abs(gripper_positions[0] -  gripper_positions[1])
         print('diff =', diff)
         target = diff - 0.001
-        Entity.rob.gripper_control_force(target,200)
+        entity.rob.gripper_control_force(target,200)
 
-
-class sensor():
-    def __init__(self):
-        self.x =0  
-        self.rot=0  
-        self.gripForce = 20
-        self.visualize_data = []
-    def align_image(self, img1, img2):
-        img_size = [480, 640]
-        new_img = np.zeros([img_size[0], img_size[1] * 2, 3], dtype=np.uint8)
-        new_img[:img1.shape[0], :img1.shape[1]] = img2[..., :3]
-        new_img[:img2.shape[0], img_size[1]:img_size[1] + img2.shape[1], :] = (img1[..., :3])[..., ::-1]
-        return new_img
-    def setup_sensor(self):
-        self.gelsight = taxim_robot.Sensor(width=640, height=480, visualize_gui=True)
-        self.cam = utils.Camera(pybullet,[640,480])
-        sensorLinks = Entity.rob.get_id_by_name(["guide_joint_finger_left"])
-        self.gelsight.add_camera(Entity.robot, sensorLinks)
-        nbJoint = pybullet.getNumJoints(Entity.robot)
-        self.sensorID1= Entity.rob.get_id_by_name(["guide_joint_finger_left"])
-        self.gelsight.add_object(Entity.urdfObj, Entity.objID, force_range=Entity.force_range, deformation=Entity.deformation)
-
-    def sensor_start(self):
-            tactileColor_tmp, _ = self.gelsight.render()
-            visionColor_tmp, _ = self.cam.get_image()
-            self.visualize_data.append(self.align_image(tactileColor_tmp[0], visionColor_tmp))
-            vision_size, tactile_size = visionColor_tmp.shape, tactileColor_tmp[0].shape
-            video_path = os.path.join("video", "demo.mp4")
-            self.rec = utils.video_recorder(vision_size, tactile_size, path=video_path, fps=30)
-
-    def sensor_read(self):
-        #what is the grip force?
-        normalForce0, lateralForce0 = utils.get_forces(pybullet, Entity.robot, Entity.objID, self.sensorID1[0], -1)
-        tactileColor, tactileDepth = self.gelsight.render()
-        data_dict={}
-        data_dict["tactileColorL"], data_dict["tactileDepthL"] = tactileColor[0], tactileDepth[0]
-        data_dict["visionColor"], data_dict["visionDepth"] = self.cam.get_image()
-        normalForce = [normalForce0]
-        data_dict["normalForce"] = normalForce
-        data_dict["height"], data_dict["gripForce"], data_dict["rot"] = utils.heightSim2Real(
-            [0,0,0]), self.gripForce, self.rot
-        # objPos0, objOri0, _ = utils.get_object_pose(pb, objID)
-        self.visualize_data.append(self.align_image(data_dict["tactileColorL"], data_dict["visionColor"]))
-
-    def save_data(self):
-        tactileColor_tmp, depth = self.gelsight.render()
-        visionColor_tmp, _ = self.cam.get_image()
-        self.visualize_data.append(self.align_image(tactileColor_tmp[0], visionColor_tmp))
-        
-        # gelsight.updateGUI(tactileColor_tmp, depth)
-        # objPos, objOri, _ = utils.get_object_pose(pb, objID)
-        # label = 1*(normalForce0 > 0.1 and np.linalg.norm(objOri - objStartOrientation) < 0.1)
-        # data_dict["label"] = label
-        self.data_dict["visual"] = self.visualize_data        
-    def save_data2(self):
-        tactileColor_tmp, depth = self.gelsight.render()
-        visionColor, visionDepth = self.cam.get_image()
-        self.rec.capture(visionColor.copy(), tactileColor_tmp[0].copy())   
-
-def generate_config_list(self):
-        ## maybe a look up table
-        force_range_list = {
-            "cube": [10],
-        }
-        gripForce_list = force_range_list["cube"]
-        dx_range_list = defaultdict(lambda: np.linspace(-0.015, 0.02, 10).tolist())
-        dx_range_list['cube'] = np.array([0.05]) + 0.04
-        dx_list = dx_range_list['cube']
-        config_list = []
-        total_data = 0
-        for j, force in enumerate(gripForce_list):
-            for k, dx in enumerate(dx_list):
-                config_list.append((force, dx))
-                total_data += 1
-        print('config=',config_list)
-        t=num_pos=num_data = 0
-        rot=0
 
 class StateMachine():
     def __init__(self):
@@ -506,11 +525,11 @@ class StateMachine():
 
 
 #initialize classes
-Setup = setup()
-Entity = entities()
-Control = control()
-Sensor = sensor()
-SS = slip_simulation()
+setup = Setup()
+entity = Entities()
+control = Control()
+Sensor = Sensor()
+ss = SlipSimulation()
 # Get the directory of the Python file
 script_dir = os.path.dirname(os.path.realpath(__file__))
 print('script dir=',script_dir)
@@ -520,26 +539,22 @@ print('script dir=',script_dir)
 # Call the main function if this script is executed directly
 if __name__ == "__main__":
 
-    Setup.start_simulation()
-    Entity.loadPlane()
-    Entity.loadRobot(script_dir)
+    setup.start_simulation()
+    entity.loadPlane()
+    entity.loadRobot(script_dir)
     # Entity.set_joints_friction(1000)
  
-    Setup.set_camera_to_robot()
+    setup.set_camera_to_robot()
     obj_select_id = 0
     #start slip simulation by moving robot to object
-    SS.init_ss()
+    ss.init_ss()
     
-    Control.start_timer()
+    control.start_timer()
 
-    #flags and counters
-    reset_grasp = True
-    slip_counter = 0
-    after_picking_up = False
-    sensor_on = False
+ 
     #try and execept are used for keyboard interrupt cntrl+c
 
-    Setup.get_object_list()
+    setup.get_object_list()
     try:
         
         t=0
@@ -547,57 +562,55 @@ if __name__ == "__main__":
 
         while True:
             pybullet.stepSimulation()
-            Setup.adjust_camera_with_keyboard()            
-            Control.dynamic_delay()
+            setup.adjust_camera_with_keyboard()            
+            control.dynamic_delay()
             if t ==1:
                 print('Start')
-                Entity.rob.gripper_open()
-                Entity.init_gripper()
-                Entity.load_object(obj_select_id)
-                if sensor_on ==True:
+                entity.rob.gripper_open()
+                entity.init_gripper()
+                entity.load_object(obj_select_id)
+                if ss.sensor_on ==True:
                     Sensor.setup_sensor()
                     Sensor.sensor_start()
 
             if t == 100:
-                SS.go_to_object()
+                ss.go_to_object()
 
             if t == 200:
                 print('gripper close')
-                SS.grasp_object()    
+                ss.grasp_object()    
 
             #after closing gripper
             if t== 300:
                 print('pick up')
-                SS.pick_up()
+                ss.pick_up()
             
             #after robot picked up object and went back
-            if t> 600 and SS.robot_stopped()==True:
-                after_picking_up = True
+            if t> 600 and ss.robot_stopped()==True:
+                ss.after_picking_up = True
 
-            if after_picking_up == True:
-                if reset_grasp==True:
-                    gripper_positions = [pybullet.getJointState(Entity.robot, joint_index)[0] for joint_index in Entity.gripperJoints]
+            if ss.after_picking_up == True:
+                if ss.reset_grasp_flag==True:
+                    gripper_positions = [pybullet.getJointState(entity.robot, joint_index)[0] for joint_index in entity.gripperJoints]
                     print('reset grasp')
-                    SS.reset_grasp(gripper_positions)
-                    reset_grasp=False
-                if slip_counter > 50:
-                    SS.create_slip(t)
-                slip_counter+=1
-                if sensor_on == True:     
+                    ss.reset_grasp_flag(gripper_positions)
+                    ss.reset_grasp_flag=False
+                if ss.slip_counter > 50:
+                    ss.create_slip(t)
+                ss.slip_counter+=1
+                if ss.sensor_on == True:     
                     Sensor.save_data()
             
-            if t>1000 and SS.object_fell==False:
+            if t>1000 and ss.object_fell==False:
 
                 if t%3 ==0:
-                    SS.check_object_fall()
-                    if SS.object_fell ==True:
-                        pybullet.removeBody(Entity.objID)
+                    ss.check_object_fall()
+                    if ss.object_fell ==True:
+                        pybullet.removeBody(entity.objID)
                         t=0
                         obj_select_id = obj_select_id + 1
-                        after_picking_up = False
-                        reset_grasp = True
-                        SS.reset_variables()
-            if sensor_on == True:
+                        ss.reset_variables()
+            if ss.sensor_on == True:
                 if t>0:
                     if t%3 == 0:
                         Sensor.save_data2()
