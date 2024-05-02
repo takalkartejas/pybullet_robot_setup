@@ -161,14 +161,17 @@ class Control():
 
 class Entities():
     def __init__(self):
-        self.x =0
-    def loadRobot(self, script_dir):
+        # Get the directory of the Python file
+        self.script_dir = os.path.dirname(os.path.realpath(__file__))
+        
+    def loadRobot(self):
         self.robotStartPos = [0, 0, 0]  # Coordinates of the robot in the world
         self.robotStartOrientation = pybullet.getQuaternionFromEuler([0, 0, 0])  # Robot's orientation (roll, pitch, yaw)
         # Construct the full path to the URDF file
-        self.robot_urdf_file = os.path.join(script_dir, "urdf/ur5_robotiq_85_friction.urdf")
+        self.robot_urdf_file = os.path.join(self.script_dir, "urdf/ur5_robotiq_85_friction.urdf")
         self.robot = pybullet.loadURDF(self.robot_urdf_file, self.robotStartPos, self.robotStartOrientation, useFixedBase=1)
         self.rob = Robot(self.robot)
+
     def set_joints_friction(self,joint_friction):
                     # Set friction for each joint
         num_joints = 6
@@ -316,6 +319,7 @@ class SlipSimulation():
 
         #counters
         self.slip_counter = 0
+        self.TimeSliceCounter=0
 
     def reset_variables(self):
         self.create_slip_entry_point = True
@@ -530,10 +534,6 @@ entity = Entities()
 control = Control()
 Sensor = Sensor()
 ss = SlipSimulation()
-# Get the directory of the Python file
-script_dir = os.path.dirname(os.path.realpath(__file__))
-print('script dir=',script_dir)
-
 
 
 # Call the main function if this script is executed directly
@@ -541,30 +541,21 @@ if __name__ == "__main__":
 
     setup.start_simulation()
     entity.loadPlane()
-    entity.loadRobot(script_dir)
-    # Entity.set_joints_friction(1000)
- 
+    entity.loadRobot()
     setup.set_camera_to_robot()
     obj_select_id = 0
     #start slip simulation by moving robot to object
     ss.init_ss()
-    
     control.start_timer()
-
- 
-    #try and execept are used for keyboard interrupt cntrl+c
-
     setup.get_object_list()
+    gripper_position_log=[]
+    #try and execept are used for keyboard interrupt cntrl+c
     try:
-        
-        t=0
-        gripper_position_log=[]
-
         while True:
             pybullet.stepSimulation()
             setup.adjust_camera_with_keyboard()            
             control.dynamic_delay()
-            if t ==1:
+            if ss.TimeSliceCounter ==1:
                 print('Start')
                 entity.rob.gripper_open()
                 entity.init_gripper()
@@ -573,49 +564,50 @@ if __name__ == "__main__":
                     Sensor.setup_sensor()
                     Sensor.sensor_start()
 
-            if t == 100:
+            if ss.TimeSliceCounter == 100:
                 ss.go_to_object()
 
-            if t == 200:
+            if ss.TimeSliceCounter == 200:
                 print('gripper close')
                 ss.grasp_object()    
 
             #after closing gripper
-            if t== 300:
+            if ss.TimeSliceCounter== 300:
                 print('pick up')
                 ss.pick_up()
             
             #after robot picked up object and went back
-            if t> 600 and ss.robot_stopped()==True:
+            if ss.TimeSliceCounter> 600 and ss.robot_stopped()==True:
                 ss.after_picking_up = True
 
             if ss.after_picking_up == True:
                 if ss.reset_grasp_flag==True:
                     gripper_positions = [pybullet.getJointState(entity.robot, joint_index)[0] for joint_index in entity.gripperJoints]
                     print('reset grasp')
-                    ss.reset_grasp_flag(gripper_positions)
+                    ss.reset_grasp(gripper_positions)
                     ss.reset_grasp_flag=False
                 if ss.slip_counter > 50:
-                    ss.create_slip(t)
+                    ss.create_slip(ss.TimeSliceCounter)
                 ss.slip_counter+=1
                 if ss.sensor_on == True:     
                     Sensor.save_data()
             
-            if t>1000 and ss.object_fell==False:
+            if ss.TimeSliceCounter>1000 and ss.object_fell==False:
 
-                if t%3 ==0:
+                if ss.TimeSliceCounter%3 ==0:
                     ss.check_object_fall()
                     if ss.object_fell ==True:
                         pybullet.removeBody(entity.objID)
-                        t=0
+                        ss.TimeSliceCounter=0
                         obj_select_id = obj_select_id + 1
                         ss.reset_variables()
             if ss.sensor_on == True:
-                if t>0:
-                    if t%3 == 0:
+                if ss.TimeSliceCounter>0:
+                    if ss.TimeSliceCounter%3 == 0:
                         Sensor.save_data2()
                     Sensor.gelsight.update()
-            t=t+1
+
+            ss.TimeSliceCounter=ss.TimeSliceCounter+1
             
     except KeyboardInterrupt:
         print('keyboard interrupt')
