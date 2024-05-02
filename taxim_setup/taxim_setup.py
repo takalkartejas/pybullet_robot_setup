@@ -19,8 +19,6 @@ from setup2 import getObjInfo
 import robot_functions
 
 
-robot_func = robot_functions.robot_functions()
-robot_func.print_message()
 
 def _align_image(img1, img2):
     img_size = [480, 640]
@@ -104,7 +102,7 @@ for j, force in enumerate(gripForce_list):
         config_list.append((force, dx))
         total_data += 1
 t=num_pos=num_data = 0
-rot=0
+
 
 
 # # Run the simulation for 30 seconds
