@@ -186,7 +186,12 @@ class Entities():
                 # Set friction
                 pybullet.changeDynamics(self.robot, joint_index, lateralFriction=joint_friction)  # Adjust friction value as needed
 
-# Run simulation
+    def robot_stopped(self,threshold):
+        num_joints = 11
+        current_velocities = [pybullet.getJointState(entity.robot, i)[1] for i in range(num_joints)]
+        robot_stopped = all(abs(current_velocities[i] - 0) < threshold
+                                    for i in range(num_joints))
+        return robot_stopped
 
    
     def initialize_robot_at(self,initial_joint_positions):
@@ -351,7 +356,7 @@ class SlipSimulation():
         entity.loadPlane()
         entity.loadRobot()
         setup.set_camera_to_robot()
-        self.obj_select_id = 0
+        self.obj_select_id = 1
         entity.initialize_robot()
         control.start_timer()
         setup.get_object_list()
@@ -376,7 +381,7 @@ class SlipSimulation():
             targetPositions=gripping_joint_positions, targetVelocities=[0.00001,0.00001,0.00001,0.00001,0.00001,0.00001])
             return stateMachine.event.eNone
         
-        elif self.robot_stopped():
+        elif entity.robot_stopped(0.0006):
             return stateMachine.event.eTargetReached
         else:
             return stateMachine.event.eNone
@@ -386,14 +391,14 @@ class SlipSimulation():
             entity.rob.gripper_control_force(0.05,200)
             return stateMachine.event.eNone
         
-        elif self.robot_stopped():
-            print('stopped')
-            return stateMachine.event.eNone
+        elif entity.robot_stopped(0.0005):
+            return stateMachine.event.eTargetReached
         else:
             return stateMachine.event.eNone
 
     def pick_up(self):
-            
+        if stateMachine.stateChange==True:
+
             maxForces = np.ones(8) * 200
             gripperControlID= [5, 6]
             
@@ -403,14 +408,65 @@ class SlipSimulation():
             self.pick_up_target =[-pi/2]
             for i in range(5):
                 self.pick_up_target.append(joint_positions[i])
-            print(self.pick_up_target)
+            # print(self.pick_up_target)
             maxForces[gripperControlID] = 20
             # rob.go([0.09,0.35,0.2],width=0.5)
 
             pybullet.setJointMotorControlArray(
             entity.robot, tuple([1, 2, 3, 4, 5, 8, 10]), pybullet.POSITION_CONTROL,
             targetPositions=joint_positions, targetVelocities=[0.01,0.1,0.1,0.1,0.1,0.1,0.1], forces=[500,200,100,100,100,300,300])
-    
+            return stateMachine.event.eNone
+        elif entity.robot_stopped(0.004):
+            return stateMachine.event.eTargetReached
+        else:
+            return stateMachine.event.eNone
+        
+    def reset_grasp(self):
+        if stateMachine.stateChange==True:        
+            gripper_positions = [pybullet.getJointState(entity.robot, joint_index)[0] for joint_index in entity.gripperJoints]
+            diff = abs(gripper_positions[0] -  gripper_positions[1])
+            target = diff - 0.001
+            entity.rob.gripper_control_force(target,200)
+            return stateMachine.event.eNone
+        elif entity.robot_stopped(0.0005):
+            return stateMachine.event.eTargetReached
+        else:
+            return stateMachine.event.eNone        
+    def create_slip(self):
+        pybullet.changeDynamics(entity.objID, -1, mass=self.new_mass)
+        if self.create_slip_entry_point==True:
+            self.entry_time = self.TimeSliceCounter
+            self.create_slip_entry_point=False
+
+
+        #save the current z pos of object
+        if self.TimeSliceCounter%3 == 0:   
+            obj_position,obj_orientation = pybullet.getBasePositionAndOrientation(entity.objID)
+            obj_position_z = obj_position[2] 
+
+        # save the position in an array
+        if self.entry_time < self.TimeSliceCounter < self.entry_time +40:
+            if self.TimeSliceCounter%3 ==0:
+                self.obj_position_z_array.append(obj_position_z)
+
+        #calculate the average of the array, used to calculate pos difference and thus slip
+        diff = self.TimeSliceCounter- self.entry_time
+        # print(diff)
+        if self.TimeSliceCounter == self.entry_time +41:
+            for pos in self.obj_position_z_array:
+                self.sum = self.sum + pos
+            self.avg_obj_position_z = self.sum/len(self.obj_position_z_array)
+
+        # calculate if the object is slipping, increase the mass if not
+        if self.TimeSliceCounter >self.entry_time+ 50:
+            if self.TimeSliceCounter%3==0:
+                pos_diff_z = self.avg_obj_position_z - obj_position_z
+                # print(pos_diff_z)
+                if pos_diff_z < 0.02:
+                    self.new_mass = self.new_mass + 0.1
+                    return stateMachine.event.eNone
+                else:
+                    return stateMachine.event.eTargetReached
     def check_pick_up(self, threshold):
         # Get current positions of all joints
         num_joints = 6
@@ -426,68 +482,28 @@ class SlipSimulation():
         print('goal=', self.pick_up_target)
         print(all_in_desired_position)
 
-    def robot_stopped(self):
-        num_joints = 11
-        threshold = 0.0006
 
-        current_velocities = [pybullet.getJointState(entity.robot, i)[1] for i in range(num_joints)]
-        robot_stopped = all(abs(current_velocities[i] - 0) < threshold
-                                    for i in range(num_joints))
-        return robot_stopped
-
-    def create_slip(self, t):
-        pybullet.changeDynamics(entity.objID, -1, mass=self.new_mass)
-        if self.create_slip_entry_point==True:
-            self.entry_time = t
-            self.create_slip_entry_point=False
-
-
-        #save the current z pos of object
-        if t%3 == 0:   
-            obj_position,obj_orientation = pybullet.getBasePositionAndOrientation(entity.objID)
-            obj_position_z = obj_position[2] 
-
-        # save the position in an array
-        if self.entry_time < t < self.entry_time +40:
-            if t%3 ==0:
-                self.obj_position_z_array.append(obj_position_z)
-
-        #calculate the average of the array, used to calculate pos difference and thus slip
-        diff = t- self.entry_time
-        # print(diff)
-        if t == self.entry_time +41:
-            for pos in self.obj_position_z_array:
-                self.sum = self.sum + pos
-            self.avg_obj_position_z = self.sum/len(self.obj_position_z_array)
-
-        # calculate if the object is slipping, increase the mass if not
-        if t >self.entry_time+ 50:
-            if t%3==0:
-                pos_diff_z = self.avg_obj_position_z - obj_position_z
-                # print(pos_diff_z)
-                if pos_diff_z < 0.02:
-                    self.slip_occured =False
-                    self.new_mass = self.new_mass + 0.1
-                else:
-                    self.slip_occured = True
    
     def check_object_fall(self):
-        
-        obj_position,obj_orientation = pybullet.getBasePositionAndOrientation(entity.objID)
-        obj_position_z = obj_position[2] 
-        if abs(obj_position_z - self.avg_obj_position_z) > 0.2:
-            self.object_fell = True
+        if ss.TimeSliceCounter%3 == 0:
+            obj_position,obj_orientation = pybullet.getBasePositionAndOrientation(entity.objID)
+            obj_position_z = obj_position[2] 
+            if abs(obj_position_z - self.avg_obj_position_z) > 0.2:
+                self.object_fell = True
+            else:
+                self.object_fell = False
+        if self.object_fell == True:
+            return stateMachine.event.eTargetReached
         else:
-            self.object_fell = False
+            return stateMachine.event.eNone
     
-    def reset_grasp(self,gripper_positions):
-        diff = abs(gripper_positions[0] -  gripper_positions[1])
-        print('diff =', diff)
-        target = diff - 0.001
-        entity.rob.gripper_control_force(target,200)
-
     def reset(self):
-        x=0
+        pybullet.removeBody(entity.objID)
+        ss.TimeSliceCounter=0
+        ss.obj_select_id = ss.obj_select_id + 1
+        ss.reset_variables()
+        return stateMachine.event.eTargetReached
+    
     def end(self):
         print('simulation ended')
         raise KeyboardInterrupt
@@ -547,8 +563,9 @@ class StateMachine():
         sPickUp = 3 
         sResetGrasp = 4
         sCreateSlip = 5
-        sReset = 6
-        sEnd = 7
+        sCheckFall = 6
+        sReset = 7
+        sEnd = 8
 
     def state_machine(self): 
         ss.one_time_setup()
@@ -572,6 +589,7 @@ class StateMachine():
                 self.assign_function_to_state(ss.pick_up, self.state.sPickUp)
                 self.assign_function_to_state(ss.reset_grasp, self.state.sResetGrasp)
                 self.assign_function_to_state(ss.create_slip, self.state.sCreateSlip)
+                self.assign_function_to_state(ss.check_object_fall, self.state.sCheckFall)
                 self.assign_function_to_state(ss.reset, self.state.sReset)
                 self.assign_function_to_state(ss.end, self.state.sEnd)
                 # print current state and event
@@ -589,7 +607,22 @@ class StateMachine():
                 self.state_transition(self.state.sGoToObject, self.event.eTargetReached, self.state.sGraspObject)
 
                 self.state_transition(self.state.sGraspObject, self.event.eNone, self.state.sGraspObject)
-                self.state_transition(self.state.sGraspObject, self.event.eTargetReached, self.state.sEnd)
+                self.state_transition(self.state.sGraspObject, self.event.eTargetReached, self.state.sPickUp)
+        
+                self.state_transition(self.state.sPickUp, self.event.eNone, self.state.sPickUp)
+                self.state_transition(self.state.sPickUp, self.event.eTargetReached, self.state.sResetGrasp)
+
+                self.state_transition(self.state.sResetGrasp, self.event.eNone, self.state.sResetGrasp)
+                self.state_transition(self.state.sResetGrasp, self.event.eTargetReached, self.state.sCreateSlip)
+
+                self.state_transition(self.state.sCreateSlip, self.event.eNone, self.state.sCreateSlip)
+                self.state_transition(self.state.sCreateSlip, self.event.eTargetReached, self.state.sCheckFall)
+
+                self.state_transition(self.state.sCheckFall, self.event.eNone, self.state.sCheckFall)
+                self.state_transition(self.state.sCheckFall, self.event.eTargetReached, self.state.sReset)
+
+                self.state_transition(self.state.sReset, self.event.eNone, self.state.sReset)
+                self.state_transition(self.state.sReset, self.event.eTargetReached, self.state.sInit)
         except KeyboardInterrupt:
             print('keyboard interrupt')
             
@@ -609,16 +642,6 @@ if __name__ == "__main__":
     stateMachine.state_machine()
 
 
-
-    # if ss.TimeSliceCounter == 200:
-    #     print('gripper close')
-    #     ss.grasp_object()    
-
-    # #after closing gripper
-    # if ss.TimeSliceCounter== 300:
-    #     print('pick up')
-    #     ss.pick_up()
-    
     # #after robot picked up object and went back
     # if ss.TimeSliceCounter> 600 and ss.robot_stopped()==True:
     #     ss.after_picking_up = True
@@ -637,13 +660,13 @@ if __name__ == "__main__":
     
     # if ss.TimeSliceCounter>1000 and ss.object_fell==False:
 
-    #     if ss.TimeSliceCounter%3 ==0:
-    #         ss.check_object_fall()
-    #         if ss.object_fell ==True:
-    #             pybullet.removeBody(entity.objID)
-    #             ss.TimeSliceCounter=0
-    #             obj_select_id = obj_select_id + 1
-    #             ss.reset_variables()
+        # if ss.TimeSliceCounter%3 ==0:
+        #     ss.check_object_fall()
+        #     if ss.object_fell ==True:
+        #         pybullet.removeBody(entity.objID)
+        #         ss.TimeSliceCounter=0
+        #         obj_select_id = obj_select_id + 1
+        #         ss.reset_variables()
 pybullet.disconnect()
 
 
