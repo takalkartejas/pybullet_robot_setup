@@ -193,11 +193,11 @@ class Entities():
                                     for i in range(num_joints))
         return robot_stopped
 
-   
     def initialize_robot_at(self,initial_joint_positions):
         num_joints = 6
         for joint_index in range(num_joints):
             pybullet.resetJointState(self.robot, joint_index, initial_joint_positions[joint_index])
+   
     def initialize_robot(self):
         #start the robot in this position
         self.initial_joint_positions = [-math.pi/2,-math.pi/2,-math.pi/2,math.pi/2,-math.pi/2,-math.pi/2] 
@@ -220,6 +220,7 @@ class Entities():
         self.new_mass = 0.1
         self.new_friction = 1.0
         pybullet.changeDynamics(self.objID, -1, mass=self.new_mass)
+   
     def init_gripper(self):
         self.gripperNames = [
             "base_joint_gripper_left",
@@ -235,14 +236,14 @@ class Sensor():
         self.rot=0  
         self.gripForce = 20
         self.visualize_data = []
-
-        
+ 
     def align_image(self, img1, img2):
         img_size = [480, 640]
         new_img = np.zeros([img_size[0], img_size[1] * 2, 3], dtype=np.uint8)
         new_img[:img1.shape[0], :img1.shape[1]] = img2[..., :3]
         new_img[:img2.shape[0], img_size[1]:img_size[1] + img2.shape[1], :] = (img1[..., :3])[..., ::-1]
         return new_img
+   
     def setup_sensor(self):
         self.gelsight = taxim_robot.Sensor(width=640, height=480, visualize_gui=True)
         self.cam = utils.Camera(pybullet,[640,480])
@@ -284,6 +285,7 @@ class Sensor():
         # label = 1*(normalForce0 > 0.1 and np.linalg.norm(objOri - objStartOrientation) < 0.1)
         # data_dict["label"] = label
         self.data_dict["visual"] = self.visualize_data        
+  
     def save_data2(self):
         tactileColor_tmp, depth = self.gelsight.render()
         visionColor, visionDepth = self.cam.get_image()
@@ -309,7 +311,6 @@ class Sensor():
             rot=0
 
 
-
 class SlipSimulation():
     def __init__(self):
         self.x =0
@@ -324,7 +325,6 @@ class SlipSimulation():
         self.object_fell = False
         self.reset_grasp_flag = True
         self.after_picking_up = False
-        self.sensor_on = False
 
         #counters
         self.slip_counter = 0
@@ -339,7 +339,6 @@ class SlipSimulation():
         self.reset_grasp_flag = True
         self.slip_counter = 0
         self.after_picking_up = False
-        self.sensor_on = False 
 
     def init_ss(self):
         entity.rob.gripper_open()
@@ -432,6 +431,7 @@ class SlipSimulation():
             return stateMachine.event.eTargetReached
         else:
             return stateMachine.event.eNone        
+   
     def create_slip(self):
         pybullet.changeDynamics(entity.objID, -1, mass=self.new_mass)
         if self.create_slip_entry_point==True:
@@ -467,6 +467,7 @@ class SlipSimulation():
                     return stateMachine.event.eNone
                 else:
                     return stateMachine.event.eTargetReached
+   
     def check_pick_up(self, threshold):
         # Get current positions of all joints
         num_joints = 6
@@ -482,8 +483,6 @@ class SlipSimulation():
         print('goal=', self.pick_up_target)
         print(all_in_desired_position)
 
-
-   
     def check_object_fall(self):
         if ss.TimeSliceCounter%3 == 0:
             obj_position,obj_orientation = pybullet.getBasePositionAndOrientation(entity.objID)
@@ -507,6 +506,7 @@ class SlipSimulation():
     def end(self):
         print('simulation ended')
         raise KeyboardInterrupt
+
 
 class StateMachine():
     def __init__(self):
@@ -636,37 +636,12 @@ control = Control()
 sensor = Sensor()
 ss = SlipSimulation()
 stateMachine = StateMachine()
-
+ss.sensor_on = True
 
 if __name__ == "__main__":
+
     stateMachine.state_machine()
 
-
-    # #after robot picked up object and went back
-    # if ss.TimeSliceCounter> 600 and ss.robot_stopped()==True:
-    #     ss.after_picking_up = True
-
-    # if ss.after_picking_up == True:
-    #     if ss.reset_grasp_flag==True:
-    #         gripper_positions = [pybullet.getJointState(entity.robot, joint_index)[0] for joint_index in entity.gripperJoints]
-    #         print('reset grasp')
-    #         ss.reset_grasp(gripper_positions)
-    #         ss.reset_grasp_flag=False
-    #     if ss.slip_counter > 50:
-    #         ss.create_slip(ss.TimeSliceCounter)
-    #     ss.slip_counter+=1
-    #     if ss.sensor_on == True:     
-    #         sensor.save_data()
-    
-    # if ss.TimeSliceCounter>1000 and ss.object_fell==False:
-
-        # if ss.TimeSliceCounter%3 ==0:
-        #     ss.check_object_fall()
-        #     if ss.object_fell ==True:
-        #         pybullet.removeBody(entity.objID)
-        #         ss.TimeSliceCounter=0
-        #         obj_select_id = obj_select_id + 1
-        #         ss.reset_variables()
 pybullet.disconnect()
 
 
