@@ -1,3 +1,0 @@
-Tue Mar  5 20:18:47 2024
-WARNING: mju_openResource: unknown file 'humanoid/humanoid.xml'
-

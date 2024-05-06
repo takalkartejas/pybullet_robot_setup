@@ -101,6 +101,17 @@ class Setup():
         assert objName in self.object_names
         urdf_path = os.path.join("/app/Taxim/experiments/setup2/objects2", objName, "model.urdf")
         tree = ET.parse(urdf_path)
+
+        #change the version urdf files to 1.0 for compatibility, otherwise it gives error
+        root = tree.getroot()
+        for elem in root.iter():
+            if 'version' in elem.attrib:
+                elem.attrib['version'] = '1.0'  # Change the version here to the desired version
+        # Save the modified URDF file
+        tree.write(os.path.join("/app/Taxim/experiments/setup2/objects2", objName, "model.urdf"))
+
+
+
         mass_node = next(tree.iter('mass'))
         if mass_node is None:
             raise KeyError("No mass in the urdf file.")
@@ -194,13 +205,13 @@ class Entities():
         return robot_stopped
 
     def initialize_robot_at(self,initial_joint_positions):
-        num_joints = 6
+        num_joints = 11
         for joint_index in range(num_joints):
             pybullet.resetJointState(self.robot, joint_index, initial_joint_positions[joint_index])
    
     def initialize_robot(self):
         #start the robot in this position
-        self.initial_joint_positions = [-math.pi/2,-math.pi/2,-math.pi/2,math.pi/2,-math.pi/2,-math.pi/2] 
+        self.initial_joint_positions = [-math.pi/2,-math.pi/2,-math.pi/2,math.pi/2,-math.pi/2,-math.pi/2,0,0,-0.05,0,0.05] 
         entity.initialize_robot_at(self.initial_joint_positions)
 
     def loadPlane(self):
@@ -341,13 +352,12 @@ class SlipSimulation():
         self.after_picking_up = False
 
     def init_ss(self):
-        entity.rob.gripper_open()
-        entity.init_gripper()
+        entity.rob.gripper_control_force(0.25,200)
         entity.load_object(ss.obj_select_id)
         if ss.sensor_on ==True:
             sensor.setup_sensor()
             sensor.sensor_start()
-        time.sleep(2)
+        time.sleep(3)
         return stateMachine.event.eTargetReached
     
     def one_time_setup(self):
@@ -360,6 +370,7 @@ class SlipSimulation():
         control.start_timer()
         setup.get_object_list()
         self.gripper_position_log=[]
+        entity.init_gripper()
 
     def repitative_commands(self):
         pybullet.stepSimulation()
@@ -636,7 +647,7 @@ control = Control()
 sensor = Sensor()
 ss = SlipSimulation()
 stateMachine = StateMachine()
-ss.sensor_on = True
+ss.sensor_on = False
 
 if __name__ == "__main__":
 
