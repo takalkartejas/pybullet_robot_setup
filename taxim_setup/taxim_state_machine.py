@@ -387,7 +387,7 @@ class SlipSimulation():
         if stateMachine.stateChange == True:
             gripping_joint_positions = [-math.pi/2,-2,-1.8,2,-math.pi/2,-math.pi/2] 
             pybullet.setJointMotorControlArray(
-            entity.robot, range(6), pybullet.POSITION_CONTROL,
+            entity.robot, [0,1,2,3,4,5], pybullet.POSITION_CONTROL,
             targetPositions=gripping_joint_positions, targetVelocities=[0.00001,0.00001,0.00001,0.00001,0.00001,0.00001])
             return stateMachine.event.eNone
         
