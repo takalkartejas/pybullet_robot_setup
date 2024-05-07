@@ -61,7 +61,6 @@ class video_recorder:
 
     def capture(self, vision_image, color_image):
         img_cap = self._align_image(vision_image, color_image)
-        cv2.imwrite('saved_image.jpg', color_image)
         self.rec.write(img_cap)
 
     def release(self, new_path=None, delete=False):
@@ -83,15 +82,16 @@ class video_recorder:
 
 
 class Camera:
-    def __init__(self, pb, cameraResolution=[320, 240]):
+    def __init__(self, pb, focus, cameraResolution=[320, 240], ):
         self.cameraResolution = cameraResolution
 
-        camTargetPos = [0.581, 0.002, 0.2]
-        camDistance = 0.6
+        # camTargetPos = [0.581, 0.002, 0.2]
+        camTargetPos = focus
+        camDistance = 1
         upAxisIndex = 2
 
-        yaw = 50
-        pitch = 0
+        yaw = 180
+        pitch = -20
         roll = 0
         fov = 75
         nearPlane = 0.1
