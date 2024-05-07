@@ -156,7 +156,7 @@ class Setup():
         if len(obj_mesh_list) > 0:
             obj_path = obj_mesh_list[0]
             height = self.get_height(obj_path)
-            height = height/10000
+            height = height*0.0008
         else:
             mesh_file_name = os.path.join(self.objects_location, objName, "*.stl")
             mesh_file_list = glob.glob(mesh_file_name)
@@ -294,7 +294,7 @@ class Entities():
         # 'RubiksCube', 'YcbTennisBall', 'YcbMediumClamp']
         self.urdfObj, self.obj_mass, self.obj_height, self.force_range, self.deformation, _ = setup.getObjInfo()
         print('object_height=',self.obj_height)
-        self.objStartPos = [0.09, 0.35, self.obj_height / 2 +0.02 ]
+        self.objStartPos = [0.09, 0.35, self.obj_height / 2 -0.02 ]
         self.objStartOrientation = pybullet.getQuaternionFromEuler([0, 0, np.pi / 2])
         self.objID = pybullet.loadURDF(self.urdfObj, self.objStartPos, self.objStartOrientation)
         self.obj_weight = pybullet.getDynamicsInfo(self.objID, -1)[0]
@@ -456,7 +456,7 @@ class SlipSimulation():
    
     def go_to_object(self):
         if stateMachine.stateChange == True:
-            targetPosition = [entity.objStartPos[0] -0.03, entity.objStartPos[1] +0.01, entity.obj_height +0.16 ]
+            targetPosition = [entity.objStartPos[0] -0.03, entity.objStartPos[1] +0.01, entity.obj_height +0.12 ]
             entity.go_to_target(targetPosition)
 
 
@@ -541,7 +541,11 @@ class SlipSimulation():
             for pos in self.obj_position_z_array:
                 self.sum = self.sum + pos
             self.avg_obj_position_z = self.sum/len(self.obj_position_z_array)
+            print('z=',self.avg_obj_position_z)
 
+        if self.TimeSliceCounter == self.entry_time +48:
+            if self.avg_obj_position_z < 0.1:
+                return StateMachine.event.eError
         # calculate if the object is slipping, increase the mass if not
         if self.TimeSliceCounter >self.entry_time+ 50:
             if self.TimeSliceCounter%3==0:
@@ -598,6 +602,9 @@ class SlipSimulation():
         target = [entity.objStartPos[0], entity.objStartPos[1], entity.obj_height +0.13 ]
 
         return target
+
+    
+
 class StateMachine():
     def __init__(self):
         
@@ -644,6 +651,7 @@ class StateMachine():
     class event(Enum):
         eNone = 0
         eTargetReached = 1
+        eError = 2
 
 
     class state(Enum):
@@ -707,6 +715,7 @@ class StateMachine():
 
                 self.state_transition(self.state.sCreateSlip, self.event.eNone, self.state.sCreateSlip)
                 self.state_transition(self.state.sCreateSlip, self.event.eTargetReached, self.state.sCheckFall)
+                self.state_transition(self.state.sCreateSlip, self.event.eError, self.state.sReset)
 
                 self.state_transition(self.state.sCheckFall, self.event.eNone, self.state.sCheckFall)
                 self.state_transition(self.state.sCheckFall, self.event.eTargetReached, self.state.sReset)
