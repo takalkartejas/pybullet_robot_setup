@@ -656,10 +656,12 @@ class SlipSimulation():
         ss.TimeSliceCounter=0
         ss.obj_select_id = ss.obj_select_id + 1
         ss.reset_variables()
+        self.slip_log = []
         if ss.sensor_on == True:
             file_address = sensor.image_path + '/slip_log.csv'
             control.save_to_csv(control.slip_log, file_address)
         return stateMachine.event.eTargetReached
+        
 
 
     def end(self):
