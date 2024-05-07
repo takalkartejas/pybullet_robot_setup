@@ -61,6 +61,7 @@ class video_recorder:
 
     def capture(self, vision_image, color_image):
         img_cap = self._align_image(vision_image, color_image)
+        cv2.imwrite('saved_image.jpg', color_image)
         self.rec.write(img_cap)
 
     def release(self, new_path=None, delete=False):

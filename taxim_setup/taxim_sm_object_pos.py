@@ -24,6 +24,25 @@ import csv
 from stl import mesh
 #to enumarate states and events in FSM
 from enum import Enum 
+import shutil
+import csv
+import signal
+import sys
+
+
+
+# Define the signal handler function
+
+
+
+
+
+
+
+
+
+
+
 
 class Setup():
 
@@ -181,6 +200,8 @@ class Control():
     def __init__(self):
         self.x =0
         global Robot
+        self.log_data = []  
+        self.slip_log = []
 
     def start_timer(self):
         # Get the starting time
@@ -199,6 +220,13 @@ class Control():
         if step_time < 50*time_step:
             time.sleep(50*time_step - step_time) 
         self.last_time = self.current_time
+
+    # Function to save data to CSV
+    def save_to_csv(self,data,file_address):
+        with open(file_address, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['imageId', 'slip'])  # Header row
+            writer.writerows(data)
 
 
 class Entities():
@@ -294,7 +322,7 @@ class Entities():
         # 'RubiksCube', 'YcbTennisBall', 'YcbMediumClamp']
         self.urdfObj, self.obj_mass, self.obj_height, self.force_range, self.deformation, _ = setup.getObjInfo()
         print('object_height=',self.obj_height)
-        self.objStartPos = [0.09, 0.35, self.obj_height / 2 -0.02 ]
+        self.objStartPos = [0.09, 0.35, self.obj_height/2- self.obj_height*0.5 ]
         self.objStartOrientation = pybullet.getQuaternionFromEuler([0, 0, np.pi / 2])
         self.objID = pybullet.loadURDF(self.urdfObj, self.objStartPos, self.objStartOrientation)
         self.obj_weight = pybullet.getDynamicsInfo(self.objID, -1)[0]
@@ -318,6 +346,7 @@ class Sensor():
         self.rot=0  
         self.gripForce = 20
         self.visualize_data = []
+        self.image_id = 0
  
     def align_image(self, img1, img2):
         img_size = [480, 640]
@@ -371,7 +400,10 @@ class Sensor():
     def save_data2(self):
         tactileColor_tmp, depth = self.gelsight.render()
         visionColor, visionDepth = self.cam.get_image()
+        cv2.imwrite(self.image_path + '/' + str(self.image_id) +'.jpg', tactileColor_tmp[0])
+        self.image_id = self.image_id + 1
         self.rec.capture(visionColor.copy(), tactileColor_tmp[0].copy())   
+
 
     def generate_config_list(self):
             ## maybe a look up table
@@ -391,7 +423,18 @@ class Sensor():
             print('config=',config_list)
             t=num_pos=num_data = 0
             rot=0
+    def create_image_folder(self):
+        image_folder = os.path.join(entity.script_dir, "/app/tactile_images/")
+        self.image_path = image_folder + str(ss.obj_select_id)
 
+
+        # Check if the directory exists
+        if os.path.exists(self.image_path ):
+            # Remove the directory and its contents
+            shutil.rmtree(self.image_path )
+
+        # Create the directory
+        os.mkdir(self.image_path )
 
 class SlipSimulation():
     def __init__(self):
@@ -400,7 +443,7 @@ class SlipSimulation():
         
         self.obj_position_z_array = []
         self.sum =0
-        self.new_mass = 0.1
+        self.new_mass = 1
 
         #flags
         self.create_slip_entry_point = True
@@ -412,11 +455,13 @@ class SlipSimulation():
         self.slip_counter = 0
         self.TimeSliceCounter=0
 
+        self.timer = 0
+
     def reset_variables(self):
         self.create_slip_entry_point = True
         self.obj_position_z_array = []
         self.sum =0
-        self.new_mass = 0.1
+        self.new_mass = 1
         self.object_fell = False      
         self.reset_grasp_flag = True
         self.slip_counter = 0
@@ -425,10 +470,11 @@ class SlipSimulation():
     def init_ss(self):
         entity.rob.gripper_control_force(0.25,200)
         entity.load_object(ss.obj_select_id)
+        sensor.create_image_folder()
+        sensor.image_id =0
         if ss.sensor_on ==True:
             sensor.setup_sensor()
             sensor.sensor_start()
-        time.sleep(3)
         return stateMachine.event.eTargetReached
     
     def one_time_setup(self):
@@ -447,11 +493,6 @@ class SlipSimulation():
         pybullet.stepSimulation()
         setup.adjust_camera_with_keyboard()            
         control.dynamic_delay()
-        if ss.sensor_on == True:
-            if ss.TimeSliceCounter>0:
-                if ss.TimeSliceCounter%3 == 0:
-                    sensor.save_data2()
-                sensor.gelsight.update()
         ss.TimeSliceCounter=ss.TimeSliceCounter+1
    
     def go_to_object(self):
@@ -500,7 +541,7 @@ class SlipSimulation():
             entity.robot, tuple([1, 2, 3, 4, 5, 8, 10]), pybullet.POSITION_CONTROL,
             targetPositions=joint_positions, targetVelocities=[0.01,0.1,0.1,0.1,0.1,0.1,0.1], forces=[500,200,100,100,100,300,300])
             return stateMachine.event.eNone
-        elif entity.robot_stopped(0.004):
+        elif entity.robot_stopped(0.01):
             return stateMachine.event.eTargetReached
         else:
             return stateMachine.event.eNone
@@ -518,6 +559,7 @@ class SlipSimulation():
             return stateMachine.event.eNone        
    
     def create_slip(self):
+        self.slip_status = 0
         pybullet.changeDynamics(entity.objID, -1, mass=self.new_mass)
         if self.create_slip_entry_point==True:
             self.entry_time = self.TimeSliceCounter
@@ -525,9 +567,9 @@ class SlipSimulation():
 
 
         #save the current z pos of object
-        if self.TimeSliceCounter%3 == 0:   
-            obj_position,obj_orientation = pybullet.getBasePositionAndOrientation(entity.objID)
-            obj_position_z = obj_position[2] 
+ 
+        obj_position,obj_orientation = pybullet.getBasePositionAndOrientation(entity.objID)
+        obj_position_z = obj_position[2] 
 
         # save the position in an array
         if self.entry_time < self.TimeSliceCounter < self.entry_time +40:
@@ -545,17 +587,34 @@ class SlipSimulation():
 
         if self.TimeSliceCounter == self.entry_time +48:
             if self.avg_obj_position_z < 0.1:
+                control.log_data.append([self.obj_select_id , 'error'])
                 return StateMachine.event.eError
+
+
         # calculate if the object is slipping, increase the mass if not
         if self.TimeSliceCounter >self.entry_time+ 50:
-            if self.TimeSliceCounter%3==0:
-                pos_diff_z = self.avg_obj_position_z - obj_position_z
-                # print(pos_diff_z)
-                if pos_diff_z < 0.02:
-                    self.new_mass = self.new_mass + 0.5
-                    return stateMachine.event.eNone
-                else:
-                    return stateMachine.event.eTargetReached
+            pos_diff_z = self.avg_obj_position_z - obj_position_z
+            # print(pos_diff_z)
+            if pos_diff_z >0.003 < 0.01:
+                self.slip_status = 1
+            # print('pos_diff= ',pos_diff_z)
+            # print('slip', self.slip_status)
+            if ss.sensor_on == True:
+                sensor.save_data2()
+                sensor.gelsight.update()
+                control.slip_log.append([sensor.image_id, self.slip_status])
+
+
+            if pos_diff_z < 0.02:
+                self.new_mass = self.new_mass + 0.2
+                return stateMachine.event.eNone
+            else:
+                print('mass =', self.new_mass)
+                return stateMachine.event.eTargetReached
+
+
+
+            
    
     def check_pick_up(self, threshold):
         # Get current positions of all joints
@@ -573,10 +632,15 @@ class SlipSimulation():
         print(all_in_desired_position)
 
     def check_object_fall(self):
+        if ss.sensor_on == True:
+            self.slip_status = 0
+            sensor.save_data2()
+            sensor.gelsight.update() 
+            control.slip_log.append([sensor.image_id, self.slip_status])
         if ss.TimeSliceCounter%3 == 0:
             obj_position,obj_orientation = pybullet.getBasePositionAndOrientation(entity.objID)
             obj_position_z = obj_position[2] 
-            if abs(obj_position_z - self.avg_obj_position_z) > 0.2:
+            if abs(obj_position_z - self.avg_obj_position_z) > 0.1:
                 self.object_fell = True
             else:
                 self.object_fell = False
@@ -584,12 +648,17 @@ class SlipSimulation():
             return stateMachine.event.eTargetReached
         else:
             return stateMachine.event.eNone
+        
+
     
     def reset(self):
         pybullet.removeBody(entity.objID)
         ss.TimeSliceCounter=0
         ss.obj_select_id = ss.obj_select_id + 1
         ss.reset_variables()
+        if ss.sensor_on == True:
+            file_address = sensor.image_path + '/slip_log.csv'
+            control.save_to_csv(control.slip_log, file_address)
         return stateMachine.event.eTargetReached
 
 
@@ -602,7 +671,18 @@ class SlipSimulation():
         target = [entity.objStartPos[0], entity.objStartPos[1], entity.obj_height +0.13 ]
 
         return target
+    
+    def delay(self):
 
+        if stateMachine.stateChange == True:
+            self.timer = 0
+            return stateMachine.event.eNone
+        
+        elif self.timer > 20:
+            return stateMachine.event.eTargetReached
+        else:
+            self.timer+=1
+            return stateMachine.event.eNone
     
 
 class StateMachine():
@@ -664,6 +744,7 @@ class StateMachine():
         sCheckFall = 6
         sReset = 7
         sEnd = 8
+        sDelay = 9
 
     def state_machine(self): 
         ss.one_time_setup()
@@ -690,6 +771,7 @@ class StateMachine():
                 self.assign_function_to_state(ss.check_object_fall, self.state.sCheckFall)
                 self.assign_function_to_state(ss.reset, self.state.sReset)
                 self.assign_function_to_state(ss.end, self.state.sEnd)
+                self.assign_function_to_state(ss.delay, self.state.sDelay)
                 # print current state and event
                 # the print statement should mention the node name in short form at the beginning 
                 if ss.TimeSliceCounter%20 == 0 or self.stateChange==True:
@@ -699,7 +781,10 @@ class StateMachine():
                 '''******* state_transition(self,PrevState, event, NextState) *******'''
                 #sinit
                 self.state_transition(self.state.sInit, self.event.eNone, self.state.sInit)
-                self.state_transition(self.state.sInit, self.event.eTargetReached, self.state.sGoToObject)
+                self.state_transition(self.state.sInit, self.event.eTargetReached, self.state.sDelay)
+
+                self.state_transition(self.state.sDelay, self.event.eNone, self.state.sDelay)
+                self.state_transition(self.state.sDelay, self.event.eTargetReached, self.state.sGoToObject)
 
                 self.state_transition(self.state.sGoToObject, self.event.eNone, self.state.sGoToObject)
                 self.state_transition(self.state.sGoToObject, self.event.eTargetReached, self.state.sGraspObject)
@@ -735,7 +820,7 @@ control = Control()
 sensor = Sensor()
 ss = SlipSimulation()
 stateMachine = StateMachine()
-ss.sensor_on = False
+ss.sensor_on = True
 
 if __name__ == "__main__":
 
@@ -743,6 +828,8 @@ if __name__ == "__main__":
 
 pybullet.disconnect()
 
+file_address = 'log.csv'
+control.save_to_csv(control.log_data, file_address)
 
 # # Save the gripper positions log to a CSV file
 # with open("gripper_positions_log.csv", "w", newline='') as csvfile:

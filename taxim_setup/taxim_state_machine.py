@@ -357,7 +357,6 @@ class SlipSimulation():
         if ss.sensor_on ==True:
             sensor.setup_sensor()
             sensor.sensor_start()
-        time.sleep(3)
         return stateMachine.event.eTargetReached
     
     def one_time_setup(self):
@@ -365,7 +364,7 @@ class SlipSimulation():
         entity.loadPlane()
         entity.loadRobot()
         setup.set_camera_to_robot()
-        self.obj_select_id = 1
+        self.obj_select_id = 8
         entity.initialize_robot()
         control.start_timer()
         setup.get_object_list()
@@ -518,7 +517,17 @@ class SlipSimulation():
         print('simulation ended')
         raise KeyboardInterrupt
 
-
+    def delay(self):
+        if stateMachine.stateChange == True:
+            timer = 0
+            return stateMachine.event.eNone
+        
+        elif timer > 100:
+            return stateMachine.event.eTargetReached
+        else:
+            timer+=1
+            return stateMachine.event.eNone
+        
 class StateMachine():
     def __init__(self):
         
@@ -577,7 +586,7 @@ class StateMachine():
         sCheckFall = 6
         sReset = 7
         sEnd = 8
-
+        sDelay = 9
     def state_machine(self): 
         ss.one_time_setup()
         try:
@@ -603,6 +612,7 @@ class StateMachine():
                 self.assign_function_to_state(ss.check_object_fall, self.state.sCheckFall)
                 self.assign_function_to_state(ss.reset, self.state.sReset)
                 self.assign_function_to_state(ss.end, self.state.sEnd)
+                self.assign_function_to_state(ss.delay, self.state.sDelay)
                 # print current state and event
                 # the print statement should mention the node name in short form at the beginning 
                 if ss.TimeSliceCounter%20 == 0 or self.stateChange==True:
@@ -612,7 +622,10 @@ class StateMachine():
                 '''******* state_transition(self,PrevState, event, NextState) *******'''
                 #sinit
                 self.state_transition(self.state.sInit, self.event.eNone, self.state.sInit)
-                self.state_transition(self.state.sInit, self.event.eTargetReached, self.state.sGoToObject)
+                self.state_transition(self.state.sInit, self.event.eTargetReached, self.state.sDelay)
+
+                self.state_transition(self.state.sDelay, self.event.eNone, self.state.sDelay)
+                self.state_transition(self.state.sDelay, self.event.eTargetReached, self.state.sGoToObject)
 
                 self.state_transition(self.state.sGoToObject, self.event.eNone, self.state.sGoToObject)
                 self.state_transition(self.state.sGoToObject, self.event.eTargetReached, self.state.sGraspObject)
