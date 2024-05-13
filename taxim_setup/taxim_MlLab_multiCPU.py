@@ -229,8 +229,9 @@ class Setup():
         for elem in root.iter():
             if 'version' in elem.attrib:
                 elem.attrib['version'] = '1.0'  # Change the version here to the desired version
-        name =  self.object_names[ss.obj_select_id] 
+        name =  self.object_names[ss.obj_select_id+1] 
         print('object name=', name)
+
         # Find and update the filename attribute in visual and collision elements
         for visual in root.findall(".//visual"):
             geometry = visual.find("geometry")
@@ -921,8 +922,8 @@ control = Control()
 sensor = Sensor()
 ss = SlipSimulation()
 stateMachine = StateMachine()
-ss.sensor_on = True
-setup.gui = False
+ss.sensor_on = False
+setup.gui = True
 if __name__ == "__main__":
 
     stateMachine.state_machine()
