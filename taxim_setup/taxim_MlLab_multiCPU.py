@@ -53,7 +53,7 @@ class Setup():
         global entity
         # List all files in the directory
         files = os.listdir(self.objects_location)
-
+        self.gui = True
         # Extract filenames without the .obj extension
         self.object_names = [file for file in files if file.endswith('.obj')]
         # self.object_names = [name for name in os.listdir(self.objects_location) if os.path.isdir(os.path.join(self.objects_location, name))]
@@ -73,7 +73,10 @@ class Setup():
         pybullet.resetDebugVisualizerCamera(cameraDistance=self.cdist, cameraYaw=self.cyaw, cameraPitch=self.cpitch, cameraTargetPosition=self.focuse_position)
 
     def start_simulation(self):
-        self.physicsClient = pybullet.connect(pybullet.GUI)  # or pybullet.DIRECT for non-graphical version
+        if self.gui == True:
+            self.physicsClient = pybullet.connect(pybullet.GUI)  # or pybullet.DIRECT for non-graphical version
+        else:
+            self.physicsClient = pybullet.connect(pybullet.DIRECT)
         pybullet.resetSimulation()
         pybullet.setAdditionalSearchPath(pybullet_data.getDataPath())  # Set the search path to find URDF files
         '''simulation'''
@@ -356,8 +359,12 @@ class Sensor():
         return new_img
    
     def setup_sensor(self):
-        self.gelsight = taxim_robot.Sensor(width=640, height=480, visualize_gui=True)
-        self.cam = utils.Camera(pybullet,[640,480])
+        if setup.gui == True:
+            self.gelsight = taxim_robot.Sensor(width=640, height=480, visualize_gui=True)
+        else:
+            self.gelsight = taxim_robot.Sensor(width=640, height=480, visualize_gui=False)  
+        self.focuse_position,_ = pybullet.getBasePositionAndOrientation(entity.robot)   
+        self.cam = utils.Camera(pybullet,self.focuse_position,[640,480], )
         sensorLinks = entity.rob.get_id_by_name(["guide_joint_finger_left"])
         self.gelsight.add_camera(entity.robot, sensorLinks)
         nbJoint = pybullet.getNumJoints(entity.robot)
@@ -399,10 +406,10 @@ class Sensor():
   
     def save_data2(self):
         tactileColor_tmp, depth = self.gelsight.render()
-        visionColor, visionDepth = self.cam.get_image()
+        # visionColor, visionDepth = self.cam.get_image()
         cv2.imwrite(self.image_path + '/' + str(self.image_id) +'.jpg', tactileColor_tmp[0])
         self.image_id = self.image_id + 1
-        self.rec.capture(visionColor.copy(), tactileColor_tmp[0].copy())   
+        # self.rec.capture(visionColor.copy(), tactileColor_tmp[0].copy())   
 
 
     def generate_config_list(self):
@@ -454,7 +461,7 @@ class SlipSimulation():
         #counters
         self.slip_counter = 0
         self.TimeSliceCounter=0
-
+        self.robot_image_counter= 0
         self.timer = 0
 
     def reset_variables(self):
@@ -472,8 +479,9 @@ class SlipSimulation():
         entity.load_object(ss.obj_select_id)
         sensor.create_image_folder()
         sensor.image_id =0
+        sensor.setup_sensor()
         if ss.sensor_on ==True:
-            sensor.setup_sensor()
+            
             sensor.sensor_start()
         return stateMachine.event.eTargetReached
     
@@ -494,10 +502,14 @@ class SlipSimulation():
         setup.adjust_camera_with_keyboard()            
         control.dynamic_delay()
         ss.TimeSliceCounter=ss.TimeSliceCounter+1
+        if ss.TimeSliceCounter%30 ==0:
+            self.robot_image_counter+=1
+            visionColor, visionDepth = sensor.cam.get_image()
+            cv2.imwrite( '/app/tactile_images/robot/' + 'obj' + str(self.obj_select_id)+ 'image' + str(self.robot_image_counter) +'.jpg', visionColor)
    
     def go_to_object(self):
         if stateMachine.stateChange == True:
-            targetPosition = [entity.objStartPos[0] -0.03, entity.objStartPos[1] +0.01, entity.obj_height +0.12 ]
+            targetPosition = [entity.objStartPos[0] -0.01, entity.objStartPos[1]+0.02, entity.obj_height +0.1 ]
             entity.go_to_target(targetPosition)
 
 
@@ -595,7 +607,7 @@ class SlipSimulation():
         if self.TimeSliceCounter >self.entry_time+ 50:
             pos_diff_z = self.avg_obj_position_z - obj_position_z
             # print(pos_diff_z)
-            if  0.003 < pos_diff_z < 0.01:
+            if 0.003 < pos_diff_z < 0.01:
                 self.slip_status = 1
             # print('pos_diff= ',pos_diff_z)
             # print('slip', self.slip_status)
@@ -606,7 +618,7 @@ class SlipSimulation():
 
 
             if pos_diff_z < 0.02:
-                self.new_mass = self.new_mass + 0.2
+                self.new_mass = self.new_mass + 0.5
                 return stateMachine.event.eNone
             else:
                 print('mass =', self.new_mass)
@@ -656,12 +668,12 @@ class SlipSimulation():
         ss.TimeSliceCounter=0
         ss.obj_select_id = ss.obj_select_id + 1
         ss.reset_variables()
-        self.slip_log = []
+        self.robot_image_counter= 0
         if ss.sensor_on == True:
             file_address = sensor.image_path + '/slip_log.csv'
             control.save_to_csv(control.slip_log, file_address)
+            control.slip_log = []
         return stateMachine.event.eTargetReached
-        
 
 
     def end(self):
@@ -670,7 +682,7 @@ class SlipSimulation():
         raise KeyboardInterrupt
 
     def grasp_location(self):
-        target = [entity.objStartPos[0], entity.objStartPos[1], entity.obj_height +0.13 ]
+        target = [entity.objStartPos[0], entity.objStartPos[1], entity.obj_height +0.1 ]
 
         return target
     
@@ -823,7 +835,7 @@ sensor = Sensor()
 ss = SlipSimulation()
 stateMachine = StateMachine()
 ss.sensor_on = True
-
+setup.gui = False
 if __name__ == "__main__":
 
     stateMachine.state_machine()

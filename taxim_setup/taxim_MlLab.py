@@ -607,7 +607,7 @@ class SlipSimulation():
         if self.TimeSliceCounter >self.entry_time+ 50:
             pos_diff_z = self.avg_obj_position_z - obj_position_z
             # print(pos_diff_z)
-            if pos_diff_z >0.003 < 0.01:
+            if 0.003 < pos_diff_z < 0.01:
                 self.slip_status = 1
             # print('pos_diff= ',pos_diff_z)
             # print('slip', self.slip_status)
@@ -618,7 +618,7 @@ class SlipSimulation():
 
 
             if pos_diff_z < 0.02:
-                self.new_mass = self.new_mass + 0.2
+                self.new_mass = self.new_mass + 0.5
                 return stateMachine.event.eNone
             else:
                 print('mass =', self.new_mass)
@@ -672,7 +672,7 @@ class SlipSimulation():
         if ss.sensor_on == True:
             file_address = sensor.image_path + '/slip_log.csv'
             control.save_to_csv(control.slip_log, file_address)
-            self.slip_log = []
+            control.slip_log = []
         return stateMachine.event.eTargetReached
 
 
