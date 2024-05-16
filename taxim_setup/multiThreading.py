@@ -1,122 +1,83 @@
 import threading
 import queue
 import worker
+import subprocess
+import numpy as np
 
 
-def runSimulation(numberOfCPUs,operating_system,command,number_cycles,first_cycle,shapeDropLimit,splitCycles=False,nb_cycles_skip=0):        
-        #if first_cycle==number_cycles: first_cycle=number_cycles-1
-        splitCycles=False # to be removed after testing
-        affinity = 1
-        isSecondary = ""
+class MyThread(threading.Thread):
+    def __init__(self, target, args):
+        super().__init__(target=target, args=args)
+        self.result = None
+
+    def run(self):
+        self.result = self._target(*self._args, **self._kwargs)
+
+class run_simulation():
+    def __init__(self):
+        self.starting_object_id = 0
+    
+    def find_first_zero(self):
+        print(self.starting_object_id)
+        for index, val in np.ndenumerate(self.data_generation_log):
+            if index[0] >= self.starting_object_id:
+                if val == 0:
+                    return index[0]  # Return the index of the first 0 value
+                    
+        return -1  # Return -1 if 0 is not found in the array
+
+    def get_start_id(self):
+        self.data_generation_log = np.loadtxt('id_log.csv', delimiter=',')
+        dataless_object_id = self.find_first_zero()
+        
+        for object_id in range(self.starting_object_id,len(self.data_generation_log),self.no_of_objects):
+            if object_id <= dataless_object_id < object_id + self.no_of_objects:
+                self.starting_object_id= object_id + self.no_of_objects
+                return object_id
+            
+    def run_simulation1(self,start_id, no_of_objects):
+            # Specify the relative path to slip_data_generator.py
+        command = f"xvfb-run -a python slip_data_generator.py {start_id} {no_of_objects}"
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+        result = stdout.decode('utf-8').strip()  # Capture the result from stdout
+        return result == "True"  # Convert the string result to a boolean value
+
+    def manage_treads(self):
+        # Create and start threads for each argument
         threads = []
-        cyclesPerCPU = math.ceil(number_cycles/ numberOfCPUs)
-        fullCPUs =  numberOfCPUs -((cyclesPerCPU *  numberOfCPUs) - number_cycles)
-        #for example numberOfCPUs = 12, number_cycles = 500, cyclesPerCPU_wo_ceil = 41.67, cyclesPerCPU = 42
-        # 12 - ((504) - 500) = 12- 4 = 8 full cpus
-        lastC = first_cycle+cyclesPerCPU-1
-        firstC=first_cycle       
-        # Evenly spread continuous chunks of cycles on each simulation
-        if splitCycles and numberOfCPUs>number_cycles:
-            cyclesPerSubCPU = math.ceil((number_cycles*shapeDropLimit)/ numberOfCPUs)
-            cyclesPerCPU = math.ceil(number_cycles/ numberOfCPUs)
-            fullSubCPUs =  numberOfCPUs -((cyclesPerSubCPU *  numberOfCPUs) - number_cycles*shapeDropLimit)
-            #what is shareFropLimit?
-            lastSubC = 0+cyclesPerSubCPU-1
-            firstSubC=0
-            for i in range( numberOfCPUs):
-                if firstC>number_cycles:
-                    break
-                if firstSubC>number_cycles*shapeDropLimit:
-                    break
-                if i >= fullSubCPUs:
-                    if cyclesPerSubCPU <= 1:
-                        break
-                    lastSubC = lastSubC - 1
-                
-                if operating_system=="Windows":
-                    affinityStr = hex(affinity)
-                else:
-                    affinityStr = str(affinity)
-                str_headless='-h'*(i!=1) # Run the first simulation in non-headless mode to be able to see what is going on
-                #str_headless=' '
-                print(F"  Spawn simulation simulating {i} from cycles {firstC+nb_cycles_skip} to {lastC} with  {firstSubC} to {lastSubC} with CPU affinity: {affinityStr}", flush=True)
-                
-                count_h = command.count("-h")
-                # If there are more than one occurrence of "-h", remove one occurrence
-                if count_h > 1:
-                    command=command.replace("-h", "", count_h-1)
-                if operating_system=="Windows":
-                    t=threading.Thread(target=os.system, args=('start /WAIT /AFFINITY ' + affinityStr + ' ' + command.format(str_headless,firstC+self.nb_cycles_skip,lastC,firstSubC,lastSubC,isSecondary),), daemon=True)
-                else:
-                    #t=threading.Thread(target=os.system, args=('taskset -c ' + affinityStr + ' ' + command.format(str_headless,firstC+self.nb_cycles_skip,lastC,firstSubC,lastSubC,isSecondary),), daemon=True)
-                    t = threading.Thread(target=os.system, args=(f'chrt -a --pid {affinityStr} ; {command.format(str_headless,firstC+self.nb_cycles_skip,lastC,firstSubC,lastSubC,isSecondary)}',), daemon=True)
-                   
-                affinity = affinity * 2 #4 #2
-                isSecondary = ' -GisSecondary=true'
-                threads.append(t)
-                t.start()
-                firstSubC = lastSubC + 1
-                lastSubC = min(lastSubC +1+cyclesPerSubCPU,shapeDropLimit)
-                if firstSubC>shapeDropLimit:
-                    lastSubC = first_cycle+cyclesPerSubCPU-1
-                    firstSubC=0
-                    firstC = lastC + 1
-                    lastC = min(lastC + cyclesPerCPU,number_cycles)
-        else:
-            for i in range( numberOfCPUs):
-                if firstC>number_cycles:
-                    break
-                if i >= fullCPUs:
-                    if cyclesPerCPU <= 1:
-                        break
-                    lastC = lastC - 1
-                if operating_system=="Windows":
-                    affinityStr = hex(affinity)
-                else:
-                    affinityStr = str(affinity)
-                str_headless='-h'*(i!=0) # Run the first simulation in non-headless mode to be able to see what is going on
-           
-                print(F"  Spawn simulation simulating from cycles {firstC+nb_cycles_skip} to {lastC} with CPU affinity: {affinityStr}", flush=True)
-                count_h = command.count("-h")
-                # If there are more than one occurrence of "-h", remove one occurrence
-                
-                if count_h > 1:
-                    command=command.replace("-h", "", count_h-1)
-                if operating_system=="Windows":
-                    t=threading.Thread(target=os.system, args=('start /WAIT /AFFINITY ' + affinityStr + ' ' + command.format(str_headless,firstC+nb_cycles_skip,lastC,' ',' ',isSecondary),), daemon=True)
-                else:
-                    #t=threading.Thread(target=os.system, args=('taskset -c ' + affinityStr + ' ' + command.format(str_headless,firstC+nb_cycles_skip,lastC,' ',' ',isSecondary),), daemon=True)
-                    t = threading.Thread(target=os.system, args=(f'chrt -a --pid {affinityStr} ; {command.format(str_headless, firstC + nb_cycles_skip, lastC, " ", " ", isSecondary)}',), daemon=True)
-                   
-                threads.append(t)
-                t.start()
+        results = {}
+        try:
+            while True: 
+                running_threads = sum(1 for thread in threads if thread.is_alive())
+                # If the number of running threads is lower than expected, start new threads
+                while running_threads < self.no_of_threads:
+                    start_id = self.get_start_id()
+                    t = MyThread(target=self.run_simulation1, args=(start_id, self.no_of_objects))
+                    threads.append(t)
+                    t.start()
+                    running_threads += 1
+
+                # Print results for completed threads
+                for thread in threads:
+                    if not thread.is_alive() and thread.result is not None:
+                        print(f"Result for arguments {thread._args[0]}, {self.no_of_objects}: {thread.result}")
+                        threads.remove(thread)
+
+        except KeyboardInterrupt:
+            print('keyboard interrupt')
+
+    # Ensure that any remaining results are printed
+        for thread in threads:
+            if thread.result is not None:
+                print(f"Result for arguments {thread._args[0]}, {self.no_of_objects}: {thread.result}")
+
+        print("All simulations completed")
 
 
-                # Multiplication with 4 is equal to a left shift by two bits
-                affinity = affinity * 2 #4 #2
-                isSecondary = ' -GisSecondary=true'
-                firstC = lastC + 1
-                lastC = min(lastC + cyclesPerCPU,number_cycles)
-                
-        for t in threads:
-            t.join()
 
-def run_calculation(number):
-    result = worker.calculate_square(number)
-    print(f"Square of {number}: {result}")
-
-# Define the arguments for each thread
-arguments = [2, 3, 4]
-
-# Create and start threads for each argument
-threads = []
-for arg in arguments:
-    t = threading.Thread(target=run_calculation, args=(arg,))
-    threads.append(t)
-    t.start()
-
-# Wait for all threads to finish
-for t in threads:
-    t.join()
-
-print("All calculations completed")
+run = run_simulation()
+run.no_of_objects = 5
+run.no_of_threads = 5
+if __name__ == "__main__":
+    run.manage_treads()

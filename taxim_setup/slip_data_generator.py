@@ -31,7 +31,8 @@ import sys
 
 
 
-# Define the signal handler function
+
+
 
 
 
@@ -49,7 +50,7 @@ class Setup():
         self.object_names = [file for file in files if file.endswith('.obj')]
         # self.object_names = [name for name in os.listdir(self.objects_location) if os.path.isdir(os.path.join(self.objects_location, name))]
 
-        print(self.object_names)
+
 
     def turn_off_gui(self):
         self.gui = False
@@ -117,6 +118,39 @@ class Setup():
                     break
         return hcut - lcut
 
+    def generate_urdf(self):
+        id = 0
+        urdf = 'model' + str(id) +'.urdf'  
+        urdf_path = os.path.join("/app/egadtrainset/"+ str(urdf))
+        tree = ET.parse(urdf_path)
+        new_urdf = 'model' + str(ss.obj_select_id) +'.urdf'
+        new_urdf_path = os.path.join("/app/egadtrainset/"+ str(new_urdf))
+
+        #change the version urdf files to 1.0 for compatibility, otherwise it gives error
+        root = tree.getroot()
+        for elem in root.iter():
+            if 'version' in elem.attrib:
+                elem.attrib['version'] = '1.0'  # Change the version here to the desired version
+        name =  self.object_names[ss.obj_select_id] 
+        print('object name=', name)
+
+        # Find and update the filename attribute in visual and collision elements
+        for visual in root.findall(".//visual"):
+            geometry = visual.find("geometry")
+            if geometry is not None:
+                mesh = geometry.find("mesh")
+                if mesh is not None:
+                    mesh.set("filename", name)
+        for collision in root.findall(".//collision"):
+            geometry = collision.find("geometry")
+            if geometry is not None:
+                mesh = geometry.find("mesh")
+                if mesh is not None:
+                    mesh.set("filename", name)
+
+        # Save the modified URDF file
+        tree.write(new_urdf_path)
+
     def getObjInfo(self):
         # assert objName in self.object_names
         # urdf_path = os.path.join("/app/Taxim/experiments/setup2/objects2", objName, "model.urdf")
@@ -124,8 +158,14 @@ class Setup():
         urdf_path = os.path.join("/app/egadtrainset/"+ str(urdf))
         new_urdf = 'model' + str(ss.obj_select_id +1) +'.urdf'
         new_urdf_path = os.path.join("/app/egadtrainset/"+ str(new_urdf))
+        if os.path.exists(urdf_path) == False:
+            self.generate_urdf()
+
         tree = ET.parse(urdf_path)
 
+
+
+            
         #change the version urdf files to 1.0 for compatibility, otherwise it gives error
         root = tree.getroot()
         for elem in root.iter():
@@ -196,6 +236,13 @@ class Control():
         global Robot
         self.log_data = []  
         self.slip_log = []
+        #tells us which id's data has already been generated
+        self.data_generation_log = np.loadtxt('id_log.csv', delimiter=',') 
+        
+
+    def reset_log(self, starting_value, num_elements):
+        end_index = min(starting_value + num_elements, len(self.data_generation_log))
+        self.data_generation_log[starting_value:end_index] = 0
 
     def start_timer(self):
         # Get the starting time
@@ -219,15 +266,20 @@ class Control():
     def save_to_csv(self,data,file_address):
         with open(file_address, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(['imageId', 'slip'])  # Header row
+            writer.writerow(['imageId', 'slip', 'weight', 'time', 'gripperLeftPos','gripperRightPos' 'gripperForce'])  # Header row
             writer.writerows(data)
-
+    # Function to save data to CSV
+    def save_to_csv2(self,data,file_address):
+        with open(file_address, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerows(data)
 
 class Entities():
     def __init__(self):
         # Get the directory of the Python file
         self.script_dir = os.path.dirname(os.path.realpath(__file__))
         self.gripperControlID = [6,7]
+        self.gripperForce = 200
         
     def loadRobot(self):
         self.robotStartPos = [0, 0, 0]  # Coordinates of the robot in the world
@@ -282,7 +334,7 @@ class Entities():
             ez = 0
 
         euler = [ex,ey,ez]
-        print(endEffectorPos,endEffectorOrn,euler)
+        # print(endEffectorPos,endEffectorOrn,euler)
 
     def go_to_target(self, pos):
         targetOrientationEuler = [0, pi/2,0]
@@ -292,7 +344,7 @@ class Entities():
         jointPositions = pybullet.calculateInverseKinematics(entity.robot, endEffectorIndex, pos, targetOrientation)   
         jointPositions = np.array(jointPositions)
         jointPositions = jointPositions[:-2]
-        print(jointPositions)
+        # print(jointPositions)
         # width = 0.12 
         # # print('joint positions', self.gripperControlID)
         jointPositions[5] = -pi/2
@@ -465,7 +517,9 @@ class SlipSimulation():
         self.after_picking_up = False
 
     def init_ss(self):
-        entity.rob.gripper_control_force(0.25,200)
+        if self.obj_select_id - setup.start_id >= setup.no_of_objects:
+            return stateMachine.event.eAllTasksCompleted
+        entity.rob.gripper_control_force(0.25,entity.gripperForce)
         entity.load_object(ss.obj_select_id)
         sensor.create_image_folder()
         sensor.image_id =0
@@ -480,7 +534,7 @@ class SlipSimulation():
         entity.loadPlane()
         entity.loadRobot()
         setup.set_camera_to_robot()
-        self.obj_select_id = 0
+        self.obj_select_id = setup.start_id
         entity.initialize_robot()
         control.start_timer()
         setup.get_object_list()
@@ -515,7 +569,7 @@ class SlipSimulation():
         
     def grasp_object(self):
         if stateMachine.stateChange==True:
-            entity.rob.gripper_control_force(0.05,200)
+            entity.rob.gripper_control_force(0.05,entity.gripperForce)
             return stateMachine.event.eNone
         
         elif entity.robot_stopped(0.05):
@@ -597,14 +651,16 @@ class SlipSimulation():
         if self.TimeSliceCounter >self.entry_time+ 50:
             pos_diff_z = self.avg_obj_position_z - obj_position_z
             # print(pos_diff_z)
-            if 0.003 < pos_diff_z < 0.01:
+            if 0.003 < pos_diff_z:
                 self.slip_status = 1
             # print('pos_diff= ',pos_diff_z)
             # print('slip', self.slip_status)
             if ss.sensor_on == True:
                 sensor.save_data2()
                 sensor.gelsight.update()
-                control.slip_log.append([sensor.image_id, self.slip_status])
+                gripper_positions = [pybullet.getJointState(entity.robot, joint_index)[0] for joint_index in entity.gripperJoints]
+                
+                control.slip_log.append([sensor.image_id, self.slip_status, self.new_mass, self.TimeSliceCounter,gripper_positions[0],gripper_positions[1], entity.gripperForce])
 
 
             if pos_diff_z < 0.02:
@@ -634,11 +690,6 @@ class SlipSimulation():
         print(all_in_desired_position)
 
     def check_object_fall(self):
-        if ss.sensor_on == True:
-            self.slip_status = 0
-            sensor.save_data2()
-            sensor.gelsight.update() 
-            control.slip_log.append([sensor.image_id, self.slip_status])
         if ss.TimeSliceCounter%3 == 0:
             obj_position,obj_orientation = pybullet.getBasePositionAndOrientation(entity.objID)
             obj_position_z = obj_position[2] 
@@ -656,20 +707,26 @@ class SlipSimulation():
     def reset(self):
         pybullet.removeBody(entity.objID)
         ss.TimeSliceCounter=0
-        ss.obj_select_id = ss.obj_select_id + 1
+
         ss.reset_variables()
         self.robot_image_counter= 0
         if ss.sensor_on == True:
             file_address = sensor.image_path + '/slip_log.csv'
             control.save_to_csv(control.slip_log, file_address)
             control.slip_log = []
+            control.data_generation_log[ss.obj_select_id]=1
+        ss.obj_select_id = ss.obj_select_id + 1
+
         return stateMachine.event.eTargetReached
 
 
     def end(self):
-        time.sleep(5000)
+        latest_log = np.loadtxt('id_log.csv', delimiter=',')
+        control.data_generation_log = np.logical_or(control.data_generation_log, latest_log) 
+        np.savetxt('id_log.csv', control.data_generation_log, delimiter=',', fmt='%d')
         print('simulation ended')
         raise KeyboardInterrupt
+        
 
     def grasp_location(self):
         target = [entity.objStartPos[0], entity.objStartPos[1], entity.obj_height +0.1 ]
@@ -736,7 +793,7 @@ class StateMachine():
         eNone = 0
         eTargetReached = 1
         eError = 2
-
+        eAllTasksCompleted = 3
 
     class state(Enum):
         sInit = 0
@@ -749,6 +806,7 @@ class StateMachine():
         sReset = 7
         sEnd = 8
         sDelay = 9
+        sExit = 10
 
     def state_machine(self): 
         ss.one_time_setup()
@@ -786,6 +844,7 @@ class StateMachine():
                 #sinit
                 self.state_transition(self.state.sInit, self.event.eNone, self.state.sInit)
                 self.state_transition(self.state.sInit, self.event.eTargetReached, self.state.sDelay)
+                self.state_transition(self.state.sInit, self.event.eAllTasksCompleted, self.state.sEnd)
 
                 self.state_transition(self.state.sDelay, self.event.eNone, self.state.sDelay)
                 self.state_transition(self.state.sDelay, self.event.eTargetReached, self.state.sGoToObject)
@@ -811,29 +870,47 @@ class StateMachine():
 
                 self.state_transition(self.state.sReset, self.event.eNone, self.state.sReset)
                 self.state_transition(self.state.sReset, self.event.eTargetReached, self.state.sInit)
+
+                self.state_transition(self.state.sEnd, self.event.eNone, self.state.sEnd)
+                
         except KeyboardInterrupt:
             print('keyboard interrupt')
             
 
+# Define the signal handler function
 
-
-#initialize classes
-setup = Setup()
-entity = Entities()
-control = Control()
-sensor = Sensor()
-ss = SlipSimulation()
-stateMachine = StateMachine()
-ss.sensor_on = False
-setup.gui = True
-if __name__ == "__main__":
+def slip_data_generator(start_id, no_of_objects):
+    global setup, entity, control, sensor, ss, stateMachine
+    #initialize classes
+    setup = Setup()
+    entity = Entities()
+    control = Control()
+    sensor = Sensor()
+    ss = SlipSimulation()
+    stateMachine = StateMachine()
+    ss.sensor_on = True
+    setup.gui = False
+    setup.start_id = start_id
+    setup.no_of_objects = no_of_objects
+    control.reset_log(start_id, no_of_objects)
 
     stateMachine.state_machine()
+    file_address = 'log.csv'
+    control.save_to_csv(control.log_data, file_address)
+    pybullet.disconnect()
 
-pybullet.disconnect()
+    success = True
+    return success
 
-file_address = 'log.csv'
-control.save_to_csv(control.log_data, file_address)
+if __name__ == "__main__":
+    import sys
+    start_id, no_of_objects = int(sys.argv[1]), int(sys.argv[2])
+    success = slip_data_generator(start_id, no_of_objects)
+
+
+
+
+
 
 # # Save the gripper positions log to a CSV file
 # with open("gripper_positions_log.csv", "w", newline='') as csvfile:

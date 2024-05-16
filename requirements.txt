@@ -9,11 +9,12 @@ urdfpy>=0.0.22
 numpy-stl
 scipy
 deepdish
-
-#tacto requirments
-torch
-gym
+pandas
 pybulletX >= 0.4.1
+#tacto requirments
+# torch
+# gym
+
 
 # Need a specific version of PyOpenGL (forked & modified by mmatl) for pyrender
 # to run headlessly using OSMesa. Otherwise, we will get python ImportError:
