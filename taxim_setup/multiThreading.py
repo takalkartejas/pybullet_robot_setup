@@ -27,7 +27,7 @@ class run_simulation():
         return -1  # Return -1 if 0 is not found in the array
 
     def get_start_id(self):
-        self.data_generation_log = np.loadtxt('id_log.csv', delimiter=',')
+        self.data_generation_log = np.loadtxt('./id_log.csv', delimiter=',')
         dataless_object_id = self.find_first_zero()
         
         for object_id in range(self.starting_object_id,len(self.data_generation_log),self.no_of_objects):

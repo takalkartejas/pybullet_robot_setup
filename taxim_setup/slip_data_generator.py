@@ -237,7 +237,7 @@ class Control():
         self.log_data = []  
         self.slip_log = []
         #tells us which id's data has already been generated
-        self.data_generation_log = np.loadtxt('id_log.csv', delimiter=',') 
+        self.data_generation_log = np.loadtxt('./id_log.csv', delimiter=',') 
         
 
     def reset_log(self, starting_value, num_elements):
@@ -266,7 +266,7 @@ class Control():
     def save_to_csv(self,data,file_address):
         with open(file_address, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(['imageId', 'slip', 'weight', 'time', 'gripperLeftPos','gripperRightPos' 'gripperForce'])  # Header row
+            writer.writerow(['imageId', 'slip_status', 'slip_value', 'weight', 'time', 'gripperLeftPos','gripperRightPos' 'gripperForce'])  # Header row
             writer.writerows(data)
     # Function to save data to CSV
     def save_to_csv2(self,data,file_address):
@@ -651,6 +651,7 @@ class SlipSimulation():
         if self.TimeSliceCounter >self.entry_time+ 50:
             pos_diff_z = self.avg_obj_position_z - obj_position_z
             # print(pos_diff_z)
+            self.slip_value = pos_diff_z
             if 0.003 < pos_diff_z:
                 self.slip_status = 1
             # print('pos_diff= ',pos_diff_z)
@@ -660,7 +661,7 @@ class SlipSimulation():
                 sensor.gelsight.update()
                 gripper_positions = [pybullet.getJointState(entity.robot, joint_index)[0] for joint_index in entity.gripperJoints]
                 
-                control.slip_log.append([sensor.image_id, self.slip_status, self.new_mass, self.TimeSliceCounter,gripper_positions[0],gripper_positions[1], entity.gripperForce])
+                control.slip_log.append([sensor.image_id, self.slip_status, self.slip_value, self.new_mass, self.TimeSliceCounter,gripper_positions[0],gripper_positions[1], entity.gripperForce])
 
 
             if pos_diff_z < 0.02:
@@ -721,9 +722,9 @@ class SlipSimulation():
 
 
     def end(self):
-        latest_log = np.loadtxt('id_log.csv', delimiter=',')
+        latest_log = np.loadtxt('./id_log.csv', delimiter=',')
         control.data_generation_log = np.logical_or(control.data_generation_log, latest_log) 
-        np.savetxt('id_log.csv', control.data_generation_log, delimiter=',', fmt='%d')
+        np.savetxt('./id_log.csv', control.data_generation_log, delimiter=',', fmt='%d')
         print('simulation ended')
         raise KeyboardInterrupt
         

@@ -1,8 +1,8 @@
 import numpy as np
 import time
 # Step 1: Create a dictionary with 100 elements initialized to zero
-array = np.zeros(2000)
-
+array = np.zeros(2282)
+# array[:500] = 1
 # array[1] = 0
 # array[3] = 1
 
