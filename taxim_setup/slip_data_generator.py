@@ -239,7 +239,7 @@ class Control():
         #tells us which id's data has already been generated
         self.data_generation_log = np.loadtxt('./id_log.csv', delimiter=',') 
         
-
+    # It resets a batch of id log to 0 which is being trained in this thread
     def reset_log(self, starting_value, num_elements):
         end_index = min(starting_value + num_elements, len(self.data_generation_log))
         self.data_generation_log[starting_value:end_index] = 0
@@ -764,7 +764,7 @@ class StateMachine():
         # TCS used in FSM
         '''state_machine'''
         self.TimeSliceCounter = 0
-
+        self.same_state_counter = 0
         self.stateChange = True
 
     # This function calls the respective function of a state
@@ -787,8 +787,11 @@ class StateMachine():
             if PrevState != NextState:
                 self.previous_state = PrevState   
                 self.stateChange = True
+                self.same_state_counter = 0
             else:
+                self.same_state_counter += 1
                 self.stateChange = False
+            
 
     class event(Enum):
         eNone = 0
@@ -874,6 +877,10 @@ class StateMachine():
 
                 self.state_transition(self.state.sEnd, self.event.eNone, self.state.sEnd)
                 
+                # avoid getting stuck infinitely
+                if self.same_state_counter > 20000:
+                    raise KeyboardInterrupt
+            
         except KeyboardInterrupt:
             print('keyboard interrupt')
             

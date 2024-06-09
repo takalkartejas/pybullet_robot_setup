@@ -1,4 +1,2 @@
-imageId,slip,weight,time,gripperLeftPos,gripperRightPosgripperForce
-860,error
-862,error
-864,error
+imageId,slip_status,slip_value,weight,time,gripperLeftPos,gripperRightPosgripperForce
+1094,error

@@ -37,6 +37,7 @@ class run_simulation():
             
     def run_simulation1(self,start_id, no_of_objects):
             # Specify the relative path to slip_data_generator.py
+        print('start_id= ', start_id, 'no_of_objects= ', no_of_objects)
         command = f"xvfb-run -a python slip_data_generator.py {start_id} {no_of_objects}"
         process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
