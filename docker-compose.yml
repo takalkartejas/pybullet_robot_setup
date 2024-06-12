@@ -26,10 +26,10 @@ services:
       - ./tutorial:/app/tutorial
       - /home/tejas/projects/bullet3:/app/bullet3
       - ./taxim_test/taxim_copy:/app/Taxim      
-      # - /home/tejas/projects/egad_train_set:/app/egadtrainset
-      # - /home/tejas/projects/tactile_images:/app/tactile_images
-      - $HOME/workspace/egad_train_set:/app/egadtrainset
-      - $HOME/workspace/tactile_images:/app/tactile_images
+      - /home/tejas/projects/egad_train_set:/app/egadtrainset
+      - /home/tejas/projects/tactile_images:/app/tactile_images
+      # - $HOME/workspace/egad_train_set:/app/egadtrainset
+      # - $HOME/workspace/tactile_images:/app/tactile_images
     tty: true
     stdin_open: true
     network_mode: host
