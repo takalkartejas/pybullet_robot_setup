@@ -173,7 +173,7 @@ class Setup():
                 elem.attrib['version'] = '1.0'  # Change the version here to the desired version
         name =  self.object_names[ss.obj_select_id+1] 
         print('object name=', name)
-
+        object_scaling = str(entity.object_scale)+ ' ' + str(entity.object_scale)+ ' ' + str(entity.object_scale)   
         # Find and update the filename attribute in visual and collision elements
         for visual in root.findall(".//visual"):
             geometry = visual.find("geometry")
@@ -181,6 +181,7 @@ class Setup():
                 mesh = geometry.find("mesh")
                 if mesh is not None:
                     mesh.set("filename", name)
+                    mesh.set("scale", object_scaling)
 
         for collision in root.findall(".//collision"):
             geometry = collision.find("geometry")
@@ -188,7 +189,7 @@ class Setup():
                 mesh = geometry.find("mesh")
                 if mesh is not None:
                     mesh.set("filename", name)
-
+                    mesh.set("scale", object_scaling)
 
         # Save the modified URDF file
         tree.write(new_urdf_path)
@@ -209,7 +210,7 @@ class Setup():
         if len(obj_mesh_list) > 0:
             obj_path = obj_mesh_list[0]
             height = self.get_height(obj_path)
-            height = height*0.0008
+            height = height*entity.object_scale
         else:
             mesh_file_name = os.path.join(self.objects_location, objName, "*.stl")
             mesh_file_list = glob.glob(mesh_file_name)
@@ -280,6 +281,7 @@ class Entities():
         self.script_dir = os.path.dirname(os.path.realpath(__file__))
         self.gripperControlID = [6,7]
         self.gripperForce = 200
+        self.object_scale = 0.0008
         
     def loadRobot(self):
         self.robotStartPos = [0, 0, 0]  # Coordinates of the robot in the world
@@ -368,8 +370,8 @@ class Entities():
         # 'RubiksCube', 'YcbTennisBall', 'YcbMediumClamp']
         self.urdfObj, self.obj_mass, self.obj_height, self.force_range, self.deformation, _ = setup.getObjInfo()
         print('object_height=',self.obj_height)
-        self.objStartPos = [0.09, 0.35, self.obj_height/2- self.obj_height*0.5 ]
-        self.objStartOrientation = pybullet.getQuaternionFromEuler([0, 0, np.pi / 2])
+        self.objStartPos = [0.08, 0.32, self.obj_height/2- self.obj_height*0.2 ]
+        self.objStartOrientation = pybullet.getQuaternionFromEuler([0, 0, np.pi / 4])
         self.objID = pybullet.loadURDF(self.urdfObj, self.objStartPos, self.objStartOrientation)
         self.obj_weight = pybullet.getDynamicsInfo(self.objID, -1)[0]
         self.new_mass = 0.1
@@ -553,7 +555,7 @@ class SlipSimulation():
    
     def go_to_object(self):
         if stateMachine.stateChange == True:
-            targetPosition = [entity.objStartPos[0] -0.01, entity.objStartPos[1]+0.02, entity.obj_height +0.1 ]
+            targetPosition = [entity.objStartPos[0] +0.01 , entity.objStartPos[1]+0.02, entity.obj_height +0.1 ]
             entity.go_to_target(targetPosition)
 
 
@@ -896,9 +898,10 @@ def slip_data_generator(start_id, no_of_objects):
     sensor = Sensor()
     ss = SlipSimulation()
     stateMachine = StateMachine()
-    ss.sensor_on = True
-    setup.gui = False
+    ss.sensor_on = False
+    setup.gui = True
     setup.start_id = start_id
+    entity.object_scale = 0.0006
     setup.no_of_objects = no_of_objects
     control.reset_log(start_id, no_of_objects)
 
