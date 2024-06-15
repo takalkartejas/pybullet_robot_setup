@@ -40,19 +40,24 @@ robotStartOrientation = pybullet.getQuaternionFromEuler([0, 0, 0])  # Robot's or
 # Construct the full path to the URDF file
 script_dir = os.path.dirname(os.path.realpath(__file__))
 robot_urdf_file = os.path.join(script_dir, "urdf/ur5_robotiq_85_friction.urdf")
-robot = pybullet.loadURDF(robot_urdf_file, robotStartPos, robotStartOrientation, useFixedBase=1)
-rob = Robot(robot)
+# robot = pybullet.loadURDF(robot_urdf_file, robotStartPos, robotStartOrientation, useFixedBase=1)
+# rob = Robot(robot)
 
-urdf_path = os.path.join("/app/Taxim/experiments/setup2/objects2/test_obj1/model.urdf")
-tree = ET.parse(urdf_path)
+obj_select_id = 1
+urdf = 'model' + str(obj_select_id) +'.urdf'
+urdf_path = os.path.join("/app/egadtrainset/"+ str(urdf))
 
-#change the version urdf files to 1.0 for compatibility, otherwise it gives error
-root = tree.getroot()
-for elem in root.iter():
-    if 'version' in elem.attrib:
-        elem.attrib['version'] = '1.0'  # Change the version here to the desired version
-# Save the modified URDF file
-tree.write(os.path.join("/app/Taxim/experiments/setup2/objects2/test_obj1/model.urdf"))
+# urdf_path = os.path.join("/app/Taxim/experiments/setup2/objects2/test_obj1/model.urdf")
+# tree = ET.parse(urdf_path)
+
+# #change the version urdf files to 1.0 for compatibility, otherwise it gives error
+# root = tree.getroot()
+# for elem in root.iter():
+#     if 'version' in elem.attrib:
+#         elem.attrib['version'] = '1.0'  # Change the version here to the desired version
+# # Save the modified URDF file
+# tree.write(os.path.join("/app/Taxim/experiments/setup2/objects2/test_obj1/model.urdf"))
+
 objStartPos = [-0.09, 0.65, 0.1]
 objStartOrientation = pybullet.getQuaternionFromEuler([0, 0, np.pi / 2])
 objID = pybullet.loadURDF(urdf_path, objStartPos, objStartOrientation)
@@ -84,4 +89,4 @@ while True:
             cdist+=.01
         if keys.get(120):  #X
             cdist-=.01
-        time.sleep(1)
+        time.sleep(0.0001)

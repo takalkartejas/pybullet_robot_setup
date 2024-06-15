@@ -41,7 +41,7 @@ class Setup():
     def __init__(self):
         self.pybullet_data_location = "/app/bullet3/examples/pybullet/gym/pybullet_data"
         # self.objects_location = '/app/Taxim/experiments/setup2/objects2'
-        self.objects_location = '/app/egadtrainset'
+        self.objects_location = '/app/egadtrainset/processed_meshes/'
         global entity
         # List all files in the directory
         files = os.listdir(self.objects_location)
@@ -155,9 +155,9 @@ class Setup():
         # assert objName in self.object_names
         # urdf_path = os.path.join("/app/Taxim/experiments/setup2/objects2", objName, "model.urdf")
         urdf = 'model' + str(ss.obj_select_id) +'.urdf'
-        urdf_path = os.path.join("/app/egadtrainset/"+ str(urdf))
+        urdf_path = os.path.join("/app/egadtrainset/processed_meshes/"+ str(urdf))
         new_urdf = 'model' + str(ss.obj_select_id +1) +'.urdf'
-        new_urdf_path = os.path.join("/app/egadtrainset/"+ str(new_urdf))
+        new_urdf_path = os.path.join("/app/egadtrainset/processed_meshes/"+ str(new_urdf))
         if os.path.exists(urdf_path) == False:
             self.generate_urdf()
 
@@ -171,9 +171,9 @@ class Setup():
         for elem in root.iter():
             if 'version' in elem.attrib:
                 elem.attrib['version'] = '1.0'  # Change the version here to the desired version
-        name =  self.object_names[ss.obj_select_id+1] 
+        name =  self.object_names[ss.obj_select_id+1]
         print('object name=', name)
-        object_scaling = str(entity.object_scale)+ ' ' + str(entity.object_scale)+ ' ' + str(entity.object_scale)   
+        object_scaling_urdf_string = str(1)+ ' ' + str(1)+ ' ' + str(1)   
         # Find and update the filename attribute in visual and collision elements
         for visual in root.findall(".//visual"):
             geometry = visual.find("geometry")
@@ -181,7 +181,7 @@ class Setup():
                 mesh = geometry.find("mesh")
                 if mesh is not None:
                     mesh.set("filename", name)
-                    mesh.set("scale", object_scaling)
+                    mesh.set("scale", object_scaling_urdf_string)
 
         for collision in root.findall(".//collision"):
             geometry = collision.find("geometry")
@@ -189,7 +189,7 @@ class Setup():
                 mesh = geometry.find("mesh")
                 if mesh is not None:
                     mesh.set("filename", name)
-                    mesh.set("scale", object_scaling)
+                    mesh.set("scale", object_scaling_urdf_string)
 
         # Save the modified URDF file
         tree.write(new_urdf_path)
@@ -210,7 +210,6 @@ class Setup():
         if len(obj_mesh_list) > 0:
             obj_path = obj_mesh_list[0]
             height = self.get_height(obj_path)
-            height = height*entity.object_scale
         else:
             mesh_file_name = os.path.join(self.objects_location, objName, "*.stl")
             mesh_file_list = glob.glob(mesh_file_name)
@@ -281,7 +280,6 @@ class Entities():
         self.script_dir = os.path.dirname(os.path.realpath(__file__))
         self.gripperControlID = [6,7]
         self.gripperForce = 200
-        self.object_scale = 0.0008
         
     def loadRobot(self):
         self.robotStartPos = [0, 0, 0]  # Coordinates of the robot in the world
@@ -370,11 +368,11 @@ class Entities():
         # 'RubiksCube', 'YcbTennisBall', 'YcbMediumClamp']
         self.urdfObj, self.obj_mass, self.obj_height, self.force_range, self.deformation, _ = setup.getObjInfo()
         print('object_height=',self.obj_height)
-        self.objStartPos = [0.08, 0.32, self.obj_height/2- self.obj_height*0.2 ]
-        self.objStartOrientation = pybullet.getQuaternionFromEuler([0, 0, np.pi / 4])
+        self.objStartPos = [0.08, 0.32, self.obj_height/2+ self.obj_height*0 ]
+        self.objStartOrientation = pybullet.getQuaternionFromEuler([0, 0, 0])
         self.objID = pybullet.loadURDF(self.urdfObj, self.objStartPos, self.objStartOrientation)
         self.obj_weight = pybullet.getDynamicsInfo(self.objID, -1)[0]
-        self.new_mass = 0.1
+        self.new_mass = 2
         self.new_friction = 1.0
         pybullet.changeDynamics(self.objID, -1, mass=self.new_mass)
    
@@ -555,7 +553,7 @@ class SlipSimulation():
    
     def go_to_object(self):
         if stateMachine.stateChange == True:
-            targetPosition = [entity.objStartPos[0] +0.01 , entity.objStartPos[1]+0.02, entity.obj_height +0.1 ]
+            targetPosition = [entity.objStartPos[0] , entity.objStartPos[1], entity.obj_height +0.1 ]
             entity.go_to_target(targetPosition)
 
 
@@ -901,7 +899,6 @@ def slip_data_generator(start_id, no_of_objects):
     ss.sensor_on = False
     setup.gui = True
     setup.start_id = start_id
-    entity.object_scale = 0.0006
     setup.no_of_objects = no_of_objects
     control.reset_log(start_id, no_of_objects)
 
