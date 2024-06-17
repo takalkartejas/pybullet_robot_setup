@@ -279,7 +279,7 @@ class Entities():
         # Get the directory of the Python file
         self.script_dir = os.path.dirname(os.path.realpath(__file__))
         self.gripperControlID = [6,7]
-        self.gripperForce = 200
+        self.gripperForce = 40
         
     def loadRobot(self):
         self.robotStartPos = [0, 0, 0]  # Coordinates of the robot in the world
@@ -372,8 +372,8 @@ class Entities():
         self.objStartOrientation = pybullet.getQuaternionFromEuler([0, 0, 0])
         self.objID = pybullet.loadURDF(self.urdfObj, self.objStartPos, self.objStartOrientation)
         self.obj_weight = pybullet.getDynamicsInfo(self.objID, -1)[0]
-        self.new_mass = 2
-        self.new_friction = 1.0
+        self.new_mass = 0.3
+        self.new_friction = 0.4
         pybullet.changeDynamics(self.objID, -1, mass=self.new_mass)
    
     def init_gripper(self):
@@ -449,7 +449,27 @@ class Sensor():
     def save_data2(self):
         tactileColor_tmp, depth = self.gelsight.render()
         # visionColor, visionDepth = self.cam.get_image()
+
+        max_png_value = 255
+        max_depth_value = 0.003
+
+        depth = np.array(depth)
+        # Normalize depth values to range 0 to max_depth_value
+        normalized_depth = depth[0] / max_depth_value
+        depth_png = normalized_depth*max_png_value
+        
+        max_depth = np.max(normalized_depth)
+        max_depth_png = np.max(depth_png)
+        np.set_printoptions(threshold=np.inf)
+        print('max_depth', max_depth)
+        print('max_depth_png',max_depth_png)
+
+        
+        
+        
+        
         cv2.imwrite(self.image_path + '/' + str(self.image_id) +'.jpg', tactileColor_tmp[0])
+        cv2.imwrite(self.image_path + '/depth' + str(self.image_id) +'.png', depth_png)
         self.image_id = self.image_id + 1
         # self.rec.capture(visionColor.copy(), tactileColor_tmp[0].copy())   
 
@@ -510,7 +530,7 @@ class SlipSimulation():
         self.create_slip_entry_point = True
         self.obj_position_z_array = []
         self.sum =0
-        self.new_mass = 1
+        self.new_mass = 0.3
         self.object_fell = False      
         self.reset_grasp_flag = True
         self.slip_counter = 0
@@ -607,7 +627,7 @@ class SlipSimulation():
             gripper_positions = [pybullet.getJointState(entity.robot, joint_index)[0] for joint_index in entity.gripperJoints]
             diff = abs(gripper_positions[0] -  gripper_positions[1])
             target = diff - 0.001
-            entity.rob.gripper_control_force(target,200)
+            entity.rob.gripper_control_force(target,entity.gripperForce)
             return stateMachine.event.eNone
         elif entity.robot_stopped(0.0005):
             return stateMachine.event.eTargetReached
@@ -665,7 +685,8 @@ class SlipSimulation():
 
 
             if pos_diff_z < 0.02:
-                self.new_mass = self.new_mass + 0.5
+                if pos_diff_z< 0.001:
+                    self.new_mass = self.new_mass + 0.4
                 return stateMachine.event.eNone
             else:
                 print('mass =', self.new_mass)
@@ -883,6 +904,7 @@ class StateMachine():
             
         except KeyboardInterrupt:
             print('keyboard interrupt')
+            cv2.destroyAllWindows()
             
 
 # Define the signal handler function
@@ -896,7 +918,7 @@ def slip_data_generator(start_id, no_of_objects):
     sensor = Sensor()
     ss = SlipSimulation()
     stateMachine = StateMachine()
-    ss.sensor_on = False
+    ss.sensor_on = True
     setup.gui = True
     setup.start_id = start_id
     setup.no_of_objects = no_of_objects
