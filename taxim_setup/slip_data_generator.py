@@ -173,7 +173,8 @@ class Setup():
                 elem.attrib['version'] = '1.0'  # Change the version here to the desired version
         name =  self.object_names[ss.obj_select_id+1]
         print('object name=', name)
-        object_scaling_urdf_string = str(1)+ ' ' + str(1)+ ' ' + str(1)   
+
+     
         # Find and update the filename attribute in visual and collision elements
         for visual in root.findall(".//visual"):
             geometry = visual.find("geometry")
@@ -181,7 +182,7 @@ class Setup():
                 mesh = geometry.find("mesh")
                 if mesh is not None:
                     mesh.set("filename", name)
-                    mesh.set("scale", object_scaling_urdf_string)
+                    
 
         for collision in root.findall(".//collision"):
             geometry = collision.find("geometry")
@@ -189,7 +190,7 @@ class Setup():
                 mesh = geometry.find("mesh")
                 if mesh is not None:
                     mesh.set("filename", name)
-                    mesh.set("scale", object_scaling_urdf_string)
+                    
 
         # Save the modified URDF file
         tree.write(new_urdf_path)
