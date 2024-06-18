@@ -121,10 +121,10 @@ class Setup():
     def generate_urdf(self):
         id = 0
         urdf = 'model' + str(id) +'.urdf'  
-        urdf_path = os.path.join("/app/egadtrainset/"+ str(urdf))
+        urdf_path = os.path.join("/app/egadtrainset/processed_data/"+ str(urdf))
         tree = ET.parse(urdf_path)
         new_urdf = 'model' + str(ss.obj_select_id) +'.urdf'
-        new_urdf_path = os.path.join("/app/egadtrainset/"+ str(new_urdf))
+        new_urdf_path = os.path.join("/app/egadtrainset/processed_data/"+ str(new_urdf))
 
         #change the version urdf files to 1.0 for compatibility, otherwise it gives error
         root = tree.getroot()
@@ -939,8 +939,8 @@ def slip_data_generator(start_id, no_of_objects):
     sensor = Sensor()
     ss = SlipSimulation()
     stateMachine = StateMachine()
-    ss.sensor_on = False
-    setup.gui = True
+    ss.sensor_on = True
+    setup.gui = False
     entity.obj_orient_id = 1
     setup.start_id = start_id
     setup.no_of_objects = no_of_objects
