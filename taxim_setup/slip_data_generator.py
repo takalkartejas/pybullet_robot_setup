@@ -29,7 +29,7 @@ import csv
 import signal
 import sys
 import random
-
+import itertools
 
 
 
@@ -290,8 +290,17 @@ class Entities():
         self.script_dir = os.path.dirname(os.path.realpath(__file__))
         self.gripperControlID = [6,7]
         self.gripperForce = 40
+        self.obj_orient_id = 0
         
-
+        # calculate permutations of various possbile orientations of objects
+        values = [0, pi/2, -pi/2]
+        # Generate all permutations
+        permutations = list(itertools.product(values, repeat=3))
+        self.obj_orientations  = permutations
+        # Print the permutations
+        print('obj_orientation= ', self.obj_orientations[0])
+        
+        
     def loadRobot(self):
         self.robotStartPos = [0, 0, 0]  # Coordinates of the robot in the world
         self.robotStartOrientation = pybullet.getQuaternionFromEuler([0, 0, 0])  # Robot's orientation (roll, pitch, yaw)
@@ -381,7 +390,7 @@ class Entities():
         self.urdfObj, self.obj_mass, self.obj_height, self.force_range, self.deformation, _ = setup.getObjInfo()
         print('object_height=',self.obj_height)
         self.objStartPos = [0.08, 0.32, self.obj_height/2+ self.obj_height*0 ]
-        self.objStartOrientation = pybullet.getQuaternionFromEuler([pi/4, pi/4, pi/4])
+        self.objStartOrientation = pybullet.getQuaternionFromEuler(self.obj_orientations[self.obj_orient_id])
         self.objID = pybullet.loadURDF(self.urdfObj, self.objStartPos, self.objStartOrientation)
         self.obj_weight = pybullet.getDynamicsInfo(self.objID, -1)[0]
         self.new_mass = 0.3
@@ -932,6 +941,7 @@ def slip_data_generator(start_id, no_of_objects):
     stateMachine = StateMachine()
     ss.sensor_on = False
     setup.gui = True
+    entity.obj_orient_id = 1
     setup.start_id = start_id
     setup.no_of_objects = no_of_objects
     control.reset_log(start_id, no_of_objects)
