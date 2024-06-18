@@ -28,7 +28,7 @@ import shutil
 import csv
 import signal
 import sys
-
+import random
 
 
 
@@ -49,7 +49,7 @@ class Setup():
         # Extract filenames without the .obj extension
         self.object_names = [file for file in files if file.endswith('.obj')]
         # self.object_names = [name for name in os.listdir(self.objects_location) if os.path.isdir(os.path.join(self.objects_location, name))]
-
+        self.lateral_friction_range = [0.3,0.5]
 
 
     def turn_off_gui(self):
@@ -150,7 +150,7 @@ class Setup():
 
         # Save the modified URDF file
         tree.write(new_urdf_path)
-
+    
     def getObjInfo(self):
         # assert objName in self.object_names
         # urdf_path = os.path.join("/app/Taxim/experiments/setup2/objects2", objName, "model.urdf")
@@ -174,6 +174,9 @@ class Setup():
         name =  self.object_names[ss.obj_select_id+1]
         print('object name=', name)
 
+        #select a random friction value from the given range
+        lateral_friction = random.uniform(self.lateral_friction_range[0], self.lateral_friction_range[1])
+        lateral_friction = str(lateral_friction)
      
         # Find and update the filename attribute in visual and collision elements
         for visual in root.findall(".//visual"):
@@ -190,6 +193,12 @@ class Setup():
                 mesh = geometry.find("mesh")
                 if mesh is not None:
                     mesh.set("filename", name)
+
+        # update the object friction
+        for collision in root.findall(".//contact"):
+            friction = collision.find("lateral_friction")
+            if friction is not None:
+                friction.set("value", lateral_friction)
                     
 
         # Save the modified URDF file
@@ -282,6 +291,7 @@ class Entities():
         self.gripperControlID = [6,7]
         self.gripperForce = 40
         
+
     def loadRobot(self):
         self.robotStartPos = [0, 0, 0]  # Coordinates of the robot in the world
         self.robotStartOrientation = pybullet.getQuaternionFromEuler([0, 0, 0])  # Robot's orientation (roll, pitch, yaw)
@@ -362,6 +372,7 @@ class Entities():
             # Load the ground plane
         self.planeId = pybullet.loadURDF("plane.urdf")
 
+    
     def load_object(self,obj_select_id):
         # self.urdfObj, self.obj_mass, self.obj_height, self.force_range, self.deformation, _ = getObjInfo("RubiksCube")
         #['YcbPottedMeatCan', 'YcbStrawberry','YcbTomatoSoupCan', 
@@ -370,7 +381,7 @@ class Entities():
         self.urdfObj, self.obj_mass, self.obj_height, self.force_range, self.deformation, _ = setup.getObjInfo()
         print('object_height=',self.obj_height)
         self.objStartPos = [0.08, 0.32, self.obj_height/2+ self.obj_height*0 ]
-        self.objStartOrientation = pybullet.getQuaternionFromEuler([0, 0, 0])
+        self.objStartOrientation = pybullet.getQuaternionFromEuler([pi/4, pi/4, pi/4])
         self.objID = pybullet.loadURDF(self.urdfObj, self.objStartPos, self.objStartOrientation)
         self.obj_weight = pybullet.getDynamicsInfo(self.objID, -1)[0]
         self.new_mass = 0.3
@@ -919,7 +930,7 @@ def slip_data_generator(start_id, no_of_objects):
     sensor = Sensor()
     ss = SlipSimulation()
     stateMachine = StateMachine()
-    ss.sensor_on = True
+    ss.sensor_on = False
     setup.gui = True
     setup.start_id = start_id
     setup.no_of_objects = no_of_objects
