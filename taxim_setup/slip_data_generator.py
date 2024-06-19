@@ -121,10 +121,10 @@ class Setup():
     def generate_urdf(self):
         id = 0
         urdf = 'model' + str(id) +'.urdf'  
-        urdf_path = os.path.join("/app/egadtrainset/processed_data/"+ str(urdf))
+        urdf_path = os.path.join("/app/egadtrainset/processed_meshes/"+ str(urdf))
         tree = ET.parse(urdf_path)
         new_urdf = 'model' + str(ss.obj_select_id) +'.urdf'
-        new_urdf_path = os.path.join("/app/egadtrainset/processed_data/"+ str(new_urdf))
+        new_urdf_path = os.path.join("/app/egadtrainset/processed_meshes/"+ str(new_urdf))
 
         #change the version urdf files to 1.0 for compatibility, otherwise it gives error
         root = tree.getroot()
