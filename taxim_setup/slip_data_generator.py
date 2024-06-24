@@ -952,9 +952,10 @@ def slip_data_generator(start_id, no_of_objects):
     sensor = Sensor()
     ss = SlipSimulation()
     stateMachine = StateMachine()
-    ss.sensor_on = False
-    setup.gui = True
-    entity.obj_orient_id = 1
+    ss.sensor_on = True
+    setup.gui = False
+    entity.obj_orient_id = 4
+    entity.gripperForce = 10
     setup.start_id = start_id
     setup.no_of_objects = no_of_objects
     control.reset_log(start_id, no_of_objects)
