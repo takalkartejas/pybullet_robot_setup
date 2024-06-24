@@ -26,10 +26,10 @@ services:
       - ./tutorial:/app/tutorial
       - /home/tejas/projects/bullet3:/app/bullet3
       - ./taxim_test/taxim_copy:/app/Taxim      
-      - D:/rag-tt/egad_train_set:/app/egadtrainset
-      - D:/rag-tt/tactile_images:/app/tactile_images
-      # - /home/tejas/projects/egad_train_set:/app/egadtrainset
-      # - /home/tejas/projects/tactile_images:/app/tactile_images
+      # - D:/rag-tt/egad_train_set:/app/egadtrainset
+      # - D:/rag-tt/tactile_images:/app/tactile_images
+      - /home/tejas/projects/egad_train_set:/app/egadtrainset
+      - /home/tejas/projects/tactile_images:/app/tactile_images
       # - $HOME/workspace/egad_train_set:/app/egadtrainset
       # - $HOME/workspace/tactile_images:/app/tactile_images
 
@@ -37,7 +37,7 @@ services:
     tty: true
     stdin_open: true
     network_mode: host
-      #1  
+      #1  y\
     #1=to allow docker container graphical capability
-    command: bash -c "cd /app/taxim_setup;python multiThreading.py;tail -f /dev/null"
+    command: bash -c "cd /app/taxim_setup;tail -f /dev/null"
     #python multiThreading.py;

@@ -1,1 +1,1 @@
-imageId,slip_status,slip_value,weight,time,gripperLeftPos,gripperRightPosgripperForce
+imageId,slip_status,displacement,velocity,weight,time,gripperLeftPos,gripperRightPosgripperForce

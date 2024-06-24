@@ -276,7 +276,7 @@ class Control():
     def save_to_csv(self,data,file_address):
         with open(file_address, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(['imageId', 'slip_status', 'slip_value', 'weight', 'time', 'gripperLeftPos','gripperRightPos' 'gripperForce'])  # Header row
+            writer.writerow(['imageId', 'slip_status', 'displacement','velocity', 'weight', 'time', 'gripperLeftPos','gripperRightPos' 'gripperForce'])  # Header row
             writer.writerows(data)
     # Function to save data to CSV
     def save_to_csv2(self,data,file_address):
@@ -289,7 +289,7 @@ class Entities():
         # Get the directory of the Python file
         self.script_dir = os.path.dirname(os.path.realpath(__file__))
         self.gripperControlID = [6,7]
-        self.gripperForce = 40
+        self.gripperForce = 10
         self.obj_orient_id = 0
         
         # calculate permutations of various possbile orientations of objects
@@ -478,22 +478,19 @@ class Sensor():
         # Normalize depth values to range 0 to max_depth_value
         normalized_depth = depth[0] / max_depth_value
         depth_png = normalized_depth*max_png_value
-        
-        max_depth = np.max(normalized_depth)
-        max_depth_png = np.max(depth_png)
-        np.set_printoptions(threshold=np.inf)
-        print('max_depth', max_depth)
-        print('max_depth_png',max_depth_png)
 
-        
-        
-        
-        
+
         cv2.imwrite(self.image_path + '/' + str(self.image_id) +'.jpg', tactileColor_tmp[0])
         cv2.imwrite(self.image_path + '/depth' + str(self.image_id) +'.png', depth_png)
         self.image_id = self.image_id + 1
         # self.rec.capture(visionColor.copy(), tactileColor_tmp[0].copy())   
 
+        # max_depth = np.max(normalized_depth)
+        # max_depth_png = np.max(depth_png)
+        
+
+        # print('max_depth', max_depth)
+        # print('max_depth_png',max_depth_png)
 
     def generate_config_list(self):
             ## maybe a look up table
@@ -533,7 +530,8 @@ class SlipSimulation():
         
         self.obj_position_z_array = []
         self.sum =0
-        self.new_mass = 1
+        self.new_mass = 0.1
+        self.previous_pos_diff_z = 0
 
         #flags
         self.create_slip_entry_point = True
@@ -547,11 +545,13 @@ class SlipSimulation():
         self.robot_image_counter= 0
         self.timer = 0
 
+
+
     def reset_variables(self):
         self.create_slip_entry_point = True
         self.obj_position_z_array = []
         self.sum =0
-        self.new_mass = 0.3
+        self.new_mass = 0.1
         self.object_fell = False      
         self.reset_grasp_flag = True
         self.slip_counter = 0
@@ -687,13 +687,20 @@ class SlipSimulation():
                 control.log_data.append([self.obj_select_id , 'error'])
                 return StateMachine.event.eError
 
-
+        
         # calculate if the object is slipping, increase the mass if not
         if self.TimeSliceCounter >self.entry_time+ 50:
-            pos_diff_z = self.avg_obj_position_z - obj_position_z
-            # print(pos_diff_z)
-            self.slip_value = pos_diff_z
-            if 0.003 < pos_diff_z:
+            
+            # calculate displacement and velocity in z direction
+            self.pos_diff_z = self.avg_obj_position_z - obj_position_z
+            if self.previous_pos_diff_z == 0:
+                self.previous_pos_diff_z = self.pos_diff_z
+            self.velocity = self.pos_diff_z -self.previous_pos_diff_z 
+            self.previous_pos_diff_z = self.pos_diff_z
+            print('velocity=',self.velocity)
+
+            self.slip_value = self.pos_diff_z
+            if self.velocity > 0.00001:
                 self.slip_status = 1
             # print('pos_diff= ',pos_diff_z)
             # print('slip', self.slip_status)
@@ -701,17 +708,18 @@ class SlipSimulation():
                 sensor.save_data2()
                 sensor.gelsight.update()
                 gripper_positions = [pybullet.getJointState(entity.robot, joint_index)[0] for joint_index in entity.gripperJoints]
-                
-                control.slip_log.append([sensor.image_id, self.slip_status, self.slip_value, self.new_mass, self.TimeSliceCounter,gripper_positions[0],gripper_positions[1], entity.gripperForce])
-
-
-            if pos_diff_z < 0.02:
-                if pos_diff_z< 0.001:
-                    self.new_mass = self.new_mass + 0.4
-                return stateMachine.event.eNone
-            else:
-                print('mass =', self.new_mass)
-                return stateMachine.event.eTargetReached
+            
+            control.slip_log.append([sensor.image_id, self.slip_status, self.slip_value,self.velocity, self.new_mass, self.TimeSliceCounter,gripper_positions[0],gripper_positions[1], entity.gripperForce])
+            print('z= ',self.pos_diff_z,'mass= ',self.new_mass)
+            if self.TimeSliceCounter > self.entry_time + 70:
+                if self.pos_diff_z < 0.02:
+                    if self.velocity < 0.001:
+                        self.new_mass = self.new_mass + 0.005*entity.gripperForce
+                    return stateMachine.event.eNone
+                else:
+                    print('mass =', self.new_mass)
+                    return stateMachine.event.eTargetReached
+            
 
 
 
@@ -758,7 +766,12 @@ class SlipSimulation():
             control.save_to_csv(control.slip_log, file_address)
             control.slip_log = []
             control.data_generation_log[ss.obj_select_id]=1
-        ss.obj_select_id = ss.obj_select_id + 1
+            ss.obj_select_id = ss.obj_select_id + 1
+        # file_address = sensor.image_path + '/slip_log.csv'
+        # control.save_to_csv(control.slip_log, file_address)
+        # control.slip_log = []
+        # control.data_generation_log[ss.obj_select_id]=1
+        # ss.obj_select_id = ss.obj_select_id + 1
 
         return stateMachine.event.eTargetReached
 
@@ -939,12 +952,13 @@ def slip_data_generator(start_id, no_of_objects):
     sensor = Sensor()
     ss = SlipSimulation()
     stateMachine = StateMachine()
-    ss.sensor_on = True
-    setup.gui = False
+    ss.sensor_on = False
+    setup.gui = True
     entity.obj_orient_id = 1
     setup.start_id = start_id
     setup.no_of_objects = no_of_objects
     control.reset_log(start_id, no_of_objects)
+    np.set_printoptions(threshold=np.inf)
 
     stateMachine.state_machine()
     file_address = 'log.csv'
