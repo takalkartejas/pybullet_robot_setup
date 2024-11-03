@@ -26,8 +26,11 @@ class run_simulation():
                     
         return -1  # Return -1 if 0 is not found in the array
 
+    # the start of the object id is decided based on data generation of how many objects has been completed
+    # the record of completed objects is kept in id_log.csv
     def get_start_id(self):
         self.data_generation_log = np.loadtxt('./id_log.csv', delimiter=',')
+        # the start id is decided based on first zero that is detected in id_log.csv, completed objects are changed to 1
         dataless_object_id = self.find_first_zero()
         
         for object_id in range(self.starting_object_id,len(self.data_generation_log),self.no_of_objects):
@@ -35,6 +38,7 @@ class run_simulation():
                 self.starting_object_id= object_id + self.no_of_objects
                 return object_id
             
+    # run the robot_function.py and pass the start_if and no_of_objects as arguments        
     def run_simulation1(self,start_id, no_of_objects):
             # Specify the relative path to slip_data_generator.py
         print('start_id= ', start_id, 'no_of_objects= ', no_of_objects)
@@ -53,6 +57,8 @@ class run_simulation():
                 running_threads = sum(1 for thread in threads if thread.is_alive())
                 # If the number of running threads is lower than expected, start new threads
                 while running_threads < self.no_of_threads:
+                    #start id will decide from where to start data genration for that particular thread
+                    #the thread will generate data for defined number of objects from the start id
                     start_id = self.get_start_id()
                     t = MyThread(target=self.run_simulation1, args=(start_id, self.no_of_objects))
                     threads.append(t)
@@ -78,7 +84,10 @@ class run_simulation():
 
 
 run = run_simulation()
+# each thread will perform data generation on no_of_objects defined below and then it will terminate
 run.no_of_objects = 5
+#no of threads that will run in parallel
 run.no_of_threads = 5
+
 if __name__ == "__main__":
     run.manage_treads()

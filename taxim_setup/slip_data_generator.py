@@ -11,6 +11,14 @@ import hydra
 import pdb
 import sys
 import numpy as np
+from enum import Enum 
+import shutil
+import csv
+import signal
+import sys
+import random
+import itertools
+
 sys.path.append('/app/Taxim')
 import taxim_robot
 sys.path.append('/app/Taxim/experiments')
@@ -23,15 +31,6 @@ from math import pi
 import csv
 from stl import mesh
 #to enumarate states and events in FSM
-from enum import Enum 
-import shutil
-import csv
-import signal
-import sys
-import random
-import itertools
-
-
 
 
 
@@ -443,7 +442,6 @@ class Sensor():
             self.rec = utils.video_recorder(vision_size, tactile_size, path=video_path, fps=30)
 
     def sensor_read(self):
-        #what is the grip force?
         normalForce0, lateralForce0 = utils.get_forces(pybullet, entity.robot, entity.objID, self.sensorID1[0], -1)
         tactileColor, tactileDepth = self.gelsight.render()
         data_dict={}
@@ -945,6 +943,7 @@ class StateMachine():
 
 def slip_data_generator(start_id, no_of_objects):
     global setup, entity, control, sensor, ss, stateMachine
+
     #initialize classes
     setup = Setup()
     entity = Entities()
@@ -952,8 +951,15 @@ def slip_data_generator(start_id, no_of_objects):
     sensor = Sensor()
     ss = SlipSimulation()
     stateMachine = StateMachine()
+    
+    # sensor on flag is used to easily turn sensor on and off to, 
+    # turning off sensor is helpfull for testing the behaviour of simulation without the fps getting reduced
     ss.sensor_on = True
+    
+    #gui is used for testing, not necessary in actual setup
     setup.gui = False
+
+    # this variable selects an orientation for the object, used for randomisation of data
     entity.obj_orient_id = 4
     entity.gripperForce = 10
     setup.start_id = start_id
