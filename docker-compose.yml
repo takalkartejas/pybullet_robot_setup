@@ -37,8 +37,6 @@ services:
     tty: true
     stdin_open: true
     network_mode: host
-      #1  y\
     #1=to allow docker container graphical capability
     command: bash -c "cd /app/taxim_setup;python multiThreading.py; tail -f /dev/null"
-    #python multiThreading.py;
-    #python create_id_log.py
+    # command: bash -c "cd /app/taxim_setup;python create_id_log.py; tail -f /dev/null"
